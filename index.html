@@ -215,7 +215,7 @@
 
     const API_BASE = "https://tc-backend-tf9q.onrender.com";
     async function cargarFechas(){
-      await fetch(`${API_BASE}/fechas`);
+      const r = await fetch(`${API_BASE}/fechas`);
       const data = await r.json();
       fechaSelect.innerHTML = `<option value="">Selecciona una fecha…</option>` + data.map(f=>`<option value="${f}">${f}</option>`).join('');
     }

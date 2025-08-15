@@ -17,6 +17,8 @@ from collections import OrderedDict
 # 🔑 Configuración API y Flask
 # ------------------------------
 app = Flask(__name__)
+from flask_cors import CORS
+CORS(app)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 @app.route("/")
 def home():
