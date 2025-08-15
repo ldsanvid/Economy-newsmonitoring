@@ -253,7 +253,7 @@
       const data = await r.json();
       resumenTexto.textContent = data.resumen || '';
       if (data.nube_url) {
-        nubeWrap.innerHTML = `<img src="${data.nube_url}" style="width:100%;border-radius:14px;border:1px solid var(--border)">`;
+        nubeWrap.innerHTML = `<img src="${API_BASE}${data.nube_url}?t=${Date.now()}" style="width:100%;border-radius:14px;border:1px solid var(--border)">`;
       }
       renderIndicadores(data.orden_economia, data.economia);
       renderTitulares(data.titulares, titularesDiv, '📰 Titulares');
