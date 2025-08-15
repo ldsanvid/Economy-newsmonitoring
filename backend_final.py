@@ -287,6 +287,7 @@ Noticias no relacionadas con aranceles:
             f.write(resumen_texto)
 
 # ☁️ Generar nube de palabras
+    os.makedirs("nubes", exist_ok=True)  # crea carpeta si no existe
     archivo_nube = f"nube_{fecha_str}.png"
     archivo_nube_path = os.path.join("nubes", archivo_nube)
     generar_nube(noticias_dia["Título"].tolist(), archivo_nube_path)
