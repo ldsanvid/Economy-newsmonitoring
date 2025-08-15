@@ -9,4 +9,5 @@ numpy
 openpyxl
 scikit-learn
 dateparser
+flask_cors
 gunicorn
