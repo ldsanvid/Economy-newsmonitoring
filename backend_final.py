@@ -274,7 +274,7 @@ Noticias no relacionadas con aranceles:
             resumen_texto = f.read()
     else:
         respuesta = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5",
             messages=[
                 {"role": "system", "content": "Eres un asistente experto en análisis de noticias."},
                 {"role": "user", "content": prompt}
@@ -425,9 +425,9 @@ def pregunta():
 
     # 9️⃣ Llamada a OpenAI con la misma lógica de /resumen
     respuesta = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-5",
         messages=[
-            {"role": "system", "content": "Eres un asistente experto en análisis de noticias."},
+            {"role": "system", "content": "Eres un asistente experto en análisis de noticias del ramo económico y comercial, con énfasis en aranceles, naves y parques industriales y FIBRAS."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.2,
