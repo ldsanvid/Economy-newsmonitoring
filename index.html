@@ -114,6 +114,7 @@
       <h3>📈 Indicadores económicos</h3>
       <table class="kpis" id="tablaIndicadores"><thead><tr><th>Indicador</th><th>Valor</th></tr></thead><tbody id="indicadoresBody"></tbody></table>
       <div id="titulares" class="chips"></div>
+      <div id="titularesEn" class="chips"></div>
     </section>
 
     <section id="preguntas" class="card row" style="margin-top:18px">
@@ -257,6 +258,12 @@
       }
       renderIndicadores(data.orden_economia, data.economia);
       renderTitulares(data.titulares, titularesDiv, '📰 Titulares');
+      if (data.titulares_en && data.titulares_en.length > 0) {
+        renderTitulares(data.titulares_en, document.getElementById('titularesEn'), '📰 Titulares en inglés');
+    } else {
+        document.getElementById('titularesEn').innerHTML = '<em>No hay titulares en inglés disponibles</em>';
+}
+
     }
 
     document.getElementById('btnCargar').addEventListener('click', cargarResumen);

@@ -237,10 +237,35 @@ def resumen():
     ]
     noticias_otras = noticias_dia[noticias_dia["Término"].str.lower() != "aranceles"]
 
+    def _to_lower_safe(s):
+        try: return str(s).strip().lower()
+        except: return ""
+
+    if "Idioma" in noticias_dia.columns:
+        es_ingles = noticias_dia["Idioma"].apply(_to_lower_safe).isin({"en","inglés","ingles"})
+        no_nacional = noticias_dia["Cobertura"].apply(_to_lower_safe) != "nacional"
+        notas_ingles_no_nacional = noticias_dia[es_ingles & no_nacional].copy()
+    else:
+        notas_ingles_no_nacional = pd.DataFrame(columns=noticias_dia.columns)
+
+    noticias_internacionales_forzadas = pd.concat(
+        [noticias_internacionales, notas_ingles_no_nacional],
+        ignore_index=True
+    ).drop_duplicates(subset=["Título","Fuente","Enlace"])
+
+    noticias_otras_forzadas = pd.concat(
+        [noticias_otras, notas_ingles_no_nacional],
+        ignore_index=True
+    ).drop_duplicates(subset=["Título","Fuente","Enlace"])
+
     contexto_local = "\n".join(f"- {row['Título']} ({row['Cobertura']})" for _, row in noticias_locales.iterrows())
     contexto_nacional = "\n".join(f"- {row['Título']} ({row['Cobertura']})" for _, row in noticias_nacionales.iterrows())
-    contexto_internacional = "\n".join(f"- {row['Título']} ({row['Cobertura']})" for _, row in noticias_internacionales.iterrows())
-    contexto_otros_temas = "\n".join(f"- {row['Título']}" for _, row in noticias_otras.iterrows())
+    contexto_internacional = "\n".join(
+        f"- {row['Título']} ({row['Cobertura']})" for _, row in noticias_internacionales_forzadas.iterrows()
+    )
+    contexto_otros_temas = "\n".join(
+        f"- {row['Título']}" for _, row in noticias_otras_forzadas.iterrows()
+    )
 
     prompt = f"""
     {CONTEXTO_POLITICO}
@@ -342,39 +367,57 @@ Noticias no relacionadas con aranceles:
         for col in orden_columnas:
             economia_dict[col] = economia_dia.iloc[0][col]
 
-    # 📰 Titulares
+    # 📰 Titulares sin repetir medios
     titulares_info = []
+    usados_medios = set()
 
-    # Nacionales
-    titulares_info.extend([
-        {"titulo": row["Título"], "medio": row["Fuente"], "enlace": row["Enlace"]}
-        for _, row in noticias_nacionales.head(2).iterrows()
-    ])
+    def agregar_titulares(df_origen, max_count):
+        added = 0
+        for _, row in df_origen.iterrows():
+            medio = row["Fuente"]
+            if medio not in usados_medios:
+                titulares_info.append({
+                    "titulo": row["Título"],
+                    "medio": medio,
+                    "enlace": row["Enlace"]
+                })
+                usados_medios.add(medio)
+                added += 1
+            if added >= max_count:
+                break
 
-    # Locales
-    titulares_info.extend([
-        {"titulo": row["Título"], "medio": row["Fuente"], "enlace": row["Enlace"]}
-        for _, row in noticias_locales.head(2).iterrows()
-    ])
+    # 2 nacionales + 2 locales + 2 internacionales + 2 otros = 8 titulares distintos
+    agregar_titulares(noticias_nacionales, 2)
+    agregar_titulares(noticias_locales, 2)
+    agregar_titulares(noticias_internacionales_forzadas, 2)
+    agregar_titulares(noticias_otras_forzadas, 2)
 
-    # Internacionales
-    titulares_info.extend([
-        {"titulo": row["Título"], "medio": row["Fuente"], "enlace": row["Enlace"]}
-        for _, row in noticias_internacionales.head(2).iterrows()
-    ])
+    # 📰 Titulares en inglés (máx. 8)
+    titulares_info_en = []
+    if "Idioma" in noticias_dia.columns:
+        notas_en = noticias_dia[noticias_dia["Idioma"].str.lower().isin(["en", "inglés", "ingles"])]
+        notas_en = notas_en.dropna(subset=["Título"]).drop_duplicates(subset=["Título", "Fuente", "Enlace"])
+        usados_medios_en = set()
+        for _, row in notas_en.iterrows():
+            medio = row["Fuente"]
+            if medio not in usados_medios_en:
+                titulares_info_en.append({
+                    "titulo": row["Título"],
+                    "medio": medio,
+                    "enlace": row["Enlace"]
+                })
+                usados_medios_en.add(medio)
+            if len(titulares_info_en) >= 8:
+                break
 
-    # Otros temas no aranceles
-    titulares_info.extend([
-        {"titulo": row["Título"], "medio": row["Fuente"], "enlace": row["Enlace"]}
-        for _, row in noticias_otras.head(2).iterrows()
-    ])
 
     return jsonify({
         "resumen": resumen_texto,
         "nube_url": f"/nube/{archivo_nube}",
         "economia": [economia_dict],
         "orden_economia": orden_columnas,
-        "titulares": titulares_info
+        "titulares": titulares_info,
+        "titulares_en": titulares_info_en  # 👈 nuevo bloque de titulares en inglés
     })
 
 
