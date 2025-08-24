@@ -257,9 +257,9 @@
         nubeWrap.innerHTML = `<img src="${API_BASE}${data.nube_url}?t=${Date.now()}" style="width:100%;border-radius:14px;border:1px solid var(--border)">`;
       }
       renderIndicadores(data.orden_economia, data.economia);
-      renderTitulares(data.titulares, titularesDiv, '📰 Titulares');
+      renderTitulares(data.titulares, titularesDiv, '📰 Titulares de medios de habla hispana');
       if (data.titulares_en && data.titulares_en.length > 0) {
-        renderTitulares(data.titulares_en, document.getElementById('titularesEn'), '📰 Titulares en inglés');
+        renderTitulares(data.titulares_en, document.getElementById('titularesEn'), '📰 Titulares de medios de habla inglesa');
     } else {
         document.getElementById('titularesEn').innerHTML = '<em>No hay titulares en inglés disponibles</em>';
 }
