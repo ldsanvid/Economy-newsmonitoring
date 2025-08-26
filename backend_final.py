@@ -27,7 +27,10 @@ def home():
 # 📂 Carga única de datos
 # ------------------------------
 # Noticias
-df = pd.read_csv("noticias_fondo con todas las fuentes_rango_03-07-2025.csv", encoding="utf-8")
+try:
+    df = pd.read_csv("noticias_fondo con todas las fuentes_rango_03-07-2025.csv", encoding="utf-8")
+except UnicodeDecodeError:
+    df = pd.read_csv("noticias_fondo con todas las fuentes_rango_03-07-2025.csv", encoding="latin-1")
 df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce", dayfirst=True)
 df = df.dropna(subset=["Fecha", "Título"])
 
