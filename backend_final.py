@@ -35,6 +35,21 @@ df = df.dropna(subset=["Fecha", "Título"])
 df_tipo_cambio = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tipo de Cambio")
 df_tasas = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tasas de interés")
 df_economia = pd.merge(df_tipo_cambio, df_tasas, on=["Año", "Fecha"], how="outer").fillna("")
+# Cargar hojas adicionales
+df_sofr = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Treasuries_SOFR")
+df_wall = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Wallstreet")
+df_infl_us = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónUS")
+df_infl_mx = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónMEX")
+
+# Unificar fechas
+for df_tmp in [df_sofr, df_wall, df_infl_us, df_infl_mx]:
+    df_tmp["Fecha"] = pd.to_datetime(df_tmp["Fecha"], errors="coerce").dt.date
+
+        # Unir con df_economia
+df_economia = df_economia.merge(df_sofr[["Fecha", "SOFR"]], on="Fecha", how="left")
+df_economia = df_economia.merge(df_infl_us[["Fecha", "Inflación USA"]], on="Fecha", how="left")
+df_economia = df_economia.merge(df_infl_mx[["Fecha", "Inflación México"]], on="Fecha", how="left")
+df_economia = df_economia.merge(df_wall[["Fecha", "% Dow Jones", "% S&P500", "% Nasdaq"]], on="Fecha", how="left")
 
 # ------------------------------
 # 📜 Contexto político único
@@ -369,22 +384,6 @@ Noticias no relacionadas con aranceles:
             "% S&P500",
             "% Nasdaq"
         ]
-
-        # Cargar hojas adicionales
-        df_sofr = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Treasuries_SOFR")
-        df_wall = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Wallstreet")
-        df_infl_us = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónUS")
-        df_infl_mx = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónMEX")
-
-        # Unificar fechas
-        for df_tmp in [df_sofr, df_wall, df_infl_us, df_infl_mx]:
-            df_tmp["Fecha"] = pd.to_datetime(df_tmp["Fecha"], errors="coerce").dt.date
-
-        # Unir con df_economia
-        df_economia = df_economia.merge(df_sofr[["Fecha", "SOFR"]], on="Fecha", how="left")
-        df_economia = df_economia.merge(df_infl_us[["Fecha", "Inflación USA"]], on="Fecha", how="left")
-        df_economia = df_economia.merge(df_infl_mx[["Fecha", "Inflación México"]], on="Fecha", how="left")
-        df_economia = df_economia.merge(df_wall[["Fecha", "% Dow Jones", "% S&P500", "% Nasdaq"]], on="Fecha", how="left")
 
         # Formato para nuevos indicadores
         df_economia["SOFR"] = df_economia["SOFR"].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
