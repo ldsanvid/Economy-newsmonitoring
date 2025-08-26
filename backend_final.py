@@ -13,6 +13,11 @@ from wordcloud import WordCloud
 from collections import OrderedDict
 from flask import send_file
 from collections import OrderedDict
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 
 # ------------------------------
 # 🔑 Configuración API y Flask
@@ -561,6 +566,68 @@ def pregunta():
         "respuesta": respuesta_gpt,
         "titulares_usados": titulares_info
     })
+#correoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+@app.route("/enviar_email", methods=["POST"])
+def enviar_email():
+    data = request.get_json()
+    email = data.get("email")
+    fecha_str = data.get("fecha")
+
+    if not email or not fecha_str:
+        return jsonify({"mensaje": "Debes proporcionar correo y fecha"}), 400
+
+    # 📝 Resumen guardado
+    archivo_resumen = os.path.join("resumenes", f"resumen_{fecha_str}.txt")
+    if not os.path.exists(archivo_resumen):
+        return jsonify({"mensaje": f"No hay resumen disponible para {fecha_str}"}), 404
+
+    with open(archivo_resumen, "r", encoding="utf-8") as f:
+        resumen_texto = f.read()
+
+    # ☁️ Nube
+    archivo_nube = os.path.join("nubes", f"nube_{fecha_str}.png")
+
+    # 📊 Tabla de indicadores en HTML
+    economia_dia = df_economia[df_economia["Fecha"] == pd.to_datetime(fecha_str).date()]
+    tabla_html = economia_dia.to_html(index=False, border=1) if not economia_dia.empty else "<p>No hay datos económicos</p>"
+
+    # ---- CONFIGURACIÓN DEL CORREO ----
+    remitente = "ldsantiagovidargas.93@gmail.com"
+    password = os.environ.get("GMAIL_PASSWORD_APP")  # contraseña de aplicación guardada en Render
+    destinatario = email
+
+    msg = MIMEMultipart()
+    msg["From"] = remitente
+    msg["To"] = destinatario
+    msg["Subject"] = f"Resumen de noticias {fecha_str}"
+
+    cuerpo = f"""
+    <h2>Resumen de noticias del {fecha_str}</h2>
+    <p>{resumen_texto}</p>
+    <h3>Indicadores económicos</h3>
+    {tabla_html}
+    <p>Adjunto encontrarás la nube de palabras en formato de imagen.</p>
+    """
+    msg.attach(MIMEText(cuerpo, "html"))
+
+    # Adjuntar nube
+    if os.path.exists(archivo_nube):
+        with open(archivo_nube, "rb") as f:
+            parte = MIMEBase("application", "octet-stream")
+            parte.set_payload(f.read())
+        encoders.encode_base64(parte)
+        parte.add_header("Content-Disposition", f"attachment; filename=nube_{fecha_str}.png")
+        msg.attach(parte)
+
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(remitente, password)
+        server.sendmail(remitente, destinatario, msg.as_string())
+        server.quit()
+        return jsonify({"mensaje": f"✅ Correo enviado a {destinatario}"})
+    except Exception as e:
+        return jsonify({"mensaje": f"❌ Error al enviar correo: {e}"})
 
 @app.route("/nube/<filename>")
 def serve_nube(filename):

@@ -115,6 +115,16 @@
       <table class="kpis" id="tablaIndicadores"><thead><tr><th>Indicador</th><th>Valor</th></tr></thead><tbody id="indicadoresBody"></tbody></table>
       <div id="titulares" class="chips"></div>
       <div id="titularesEn" class="chips"></div>
+      <!-- 📧 Campo para enviar por correo -->
+      <div id="emailSection" class="card row" style="margin-top:18px">
+        <h3>📧 Recibir este reporte por correo</h3>
+        <div class="controls">
+          <input id="inputEmail" type="email" placeholder="Escribe tu correo electrónico..." />
+          <button id="btnEnviarEmail" class="btn-primary">Enviar</button>
+        </div>
+        <div id="mensajeEmail" class="muted" style="margin-top:8px;"></div>
+      </div>
+
     </section>
 
     <section id="preguntas" class="card row" style="margin-top:18px">
@@ -285,6 +295,32 @@
       document.getElementById('respuestaTexto').textContent = data.respuesta || '';
       renderTitulares(data.titulares_usados, titularesPreguntaDiv, '📰 Titulares relacionados');
     });
+  document.getElementById('btnEnviarEmail').addEventListener('click', async () => {
+  const email = document.getElementById('inputEmail').value.trim();
+  const fecha = document.getElementById('fechaSelect').value;
+
+  if (!email || !fecha) {
+    document.getElementById('mensajeEmail').textContent = "⚠️ Debes escribir un correo válido y seleccionar una fecha.";
+    return;
+  }
+
+  document.getElementById('mensajeEmail').textContent = "📤 Enviando correo…";
+
+  try {
+    const r = await fetch(`${API_BASE}/enviar_email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, fecha })
+    });
+
+    const data = await r.json();
+    document.getElementById('mensajeEmail').textContent = data.mensaje || "✅ Correo enviado.";
+  } catch (error) {
+    document.getElementById('mensajeEmail').textContent = "❌ Error al enviar el correo.";
+  }
+});
+
+cargarFechas();
 
     cargarFechas();
   </script>
