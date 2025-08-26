@@ -391,17 +391,17 @@ Noticias no relacionadas con aranceles:
             "% S&P500",
             "% Nasdaq"
         ]
-
+        def format_porcentaje_directo(x):
+            try:
+                x_clean = str(x).replace('%','').strip()
+                return f"{float(x_clean):.2f}%"
+            except:
+                return ""
         # Formato para nuevos indicadores
-        economia_dia["SOFR"] = economia_dia["SOFR"].apply(
-            lambda x: f"{float(str(x).replace('%','')):.2f}%" if pd.notnull(x) and str(x).strip() != '' else ""
-        )
-        economia_dia["Inflación USA"] = economia_dia["Inflación USA"].apply(
-            lambda x: f"{float(str(x).replace('%','')):.2f}%" if pd.notnull(x) and str(x).strip() != '' else ""
-        )
-        economia_dia["Inflación México"] = economia_dia["Inflación México"].apply(
-            lambda x: f"{float(str(x).replace('%','')):.2f}%" if pd.notnull(x) and str(x).strip() != '' else ""
-        )
+        economia_dia["SOFR"] = economia_dia["SOFR"].apply(format_porcentaje_directo)
+        economia_dia["Inflación USA"] = economia_dia["Inflación USA"].apply(format_porcentaje_directo)
+        economia_dia["Inflación México"] = economia_dia["Inflación México"].apply(format_porcentaje_directo)
+
 
         def format_signed_pct(x):
             try:
