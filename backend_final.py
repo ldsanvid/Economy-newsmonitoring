@@ -345,7 +345,8 @@ Noticias no relacionadas con aranceles:
     # 📊 Indicadores económicos
     # Asegurar formato de fecha correcto
     df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
-
+    for df_tmp in [df_sofr, df_wall, df_infl_us, df_infl_mx]:
+        df_tmp["Fecha"] = pd.to_datetime(df_tmp["Fecha"], errors="coerce").dt.date
     # Filtrar datos económicos
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt]
 
