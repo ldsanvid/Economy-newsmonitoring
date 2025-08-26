@@ -353,6 +353,7 @@ Noticias no relacionadas con aranceles:
                 economia_dia[col] = economia_dia[col].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
 
         # Reordenar columnas según el orden deseado
+        # Reordenar columnas y agregar nuevos indicadores
         orden_columnas = [
             "Tipo de Cambio FIX",
             "Nivel máximo",
@@ -360,12 +361,48 @@ Noticias no relacionadas con aranceles:
             "Tasa de Interés Objetivo",
             "TIIE 28 días",
             "TIIE 91 días",
-            "TIIE 182 días"
+            "TIIE 182 días",
+            "SOFR",
+            "Inflación USA",
+            "Inflación México",
+            "% Dow Jones",
+            "% S&P500",
+            "% Nasdaq"
         ]
-        economia_dia = economia_dia.reindex(columns=orden_columnas)
+
+        # Cargar hojas adicionales
+        df_sofr = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Treasuries_SOFR")
+        df_wall = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Wallstreet")
+        df_infl_us = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónUS")
+        df_infl_mx = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónMEX")
+
+        # Unificar fechas
+        for df_tmp in [df_sofr, df_wall, df_infl_us, df_infl_mx]:
+            df_tmp["Fecha"] = pd.to_datetime(df_tmp["Fecha"], errors="coerce").dt.date
+
+        # Unir con df_economia
+        df_economia = df_economia.merge(df_sofr[["Fecha", "SOFR"]], on="Fecha", how="left")
+        df_economia = df_economia.merge(df_infl_us[["Fecha", "Inflación USA"]], on="Fecha", how="left")
+        df_economia = df_economia.merge(df_infl_mx[["Fecha", "Inflación México"]], on="Fecha", how="left")
+        df_economia = df_economia.merge(df_wall[["Fecha", "% Dow Jones", "% S&P500", "% Nasdaq"]], on="Fecha", how="left")
+
+        # Formato para nuevos indicadores
+        df_economia["SOFR"] = df_economia["SOFR"].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
+        df_economia["Inflación USA"] = df_economia["Inflación USA"].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
+        df_economia["Inflación México"] = df_economia["Inflación México"].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
+
+        def format_signed_pct(x):
+            return f"{x:+.2%}" if pd.notnull(x) else ""
+
+        df_economia["% Dow Jones"] = df_economia["% Dow Jones"].apply(format_signed_pct)
+        df_economia["% S&P500"] = df_economia["% S&P500"].apply(format_signed_pct)
+        df_economia["% Nasdaq"] = df_economia["% Nasdaq"].apply(format_signed_pct)
+
+        # Convertir a OrderedDict para frontend
         economia_dict = OrderedDict()
         for col in orden_columnas:
-            economia_dict[col] = economia_dia.iloc[0][col]
+            economia_dict[col] = economia_dia.iloc[0].get(col, "")
+
 
     # 📰 Titulares sin repetir medios
     titulares_info = []
