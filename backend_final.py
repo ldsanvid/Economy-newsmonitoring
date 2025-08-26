@@ -387,9 +387,10 @@ Noticias no relacionadas con aranceles:
         ]
 
         # Formato para nuevos indicadores
-        df_economia["SOFR"] = df_economia["SOFR"].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
-        df_economia["Inflación USA"] = df_economia["Inflación USA"].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
-        df_economia["Inflación México"] = df_economia["Inflación México"].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
+        df_economia["SOFR"] = df_economia["SOFR"].apply(lambda x: f"{float(x)*100:.2f}%" if pd.notnull(x) else "")
+        df_economia["Inflación USA"] = df_economia["Inflación USA"].apply(lambda x: f"{float(x)*100:.2f}%" if pd.notnull(x) else "")
+        df_economia["Inflación México"] = df_economia["Inflación México"].apply(lambda x: f"{float(x)*100:.2f}%" if pd.notnull(x) else "")
+
 
         def format_signed_pct(x):
             return f"{x:+.2%}" if pd.notnull(x) else ""
