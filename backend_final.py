@@ -346,6 +346,11 @@ Noticias no relacionadas con aranceles:
     # 📊 Indicadores económicos
     # Filtrar datos económicos
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt]
+    # Si la inflación USA está vacía en el día seleccionado, usar el valor más reciente disponible
+    if economia_dia["Inflación USA"].isnull().all() or economia_dia["Inflación USA"].iloc[0] in ["", None]:
+        inflacion_usa_reciente = df_economia["Inflación USA"].dropna().replace("", np.nan).dropna().iloc[-1]
+        economia_dia["Inflación USA"] = inflacion_usa_reciente
+
 
     # Si no hay datos exactos, usar el más reciente antes de esa fecha
     if economia_dia.empty:
