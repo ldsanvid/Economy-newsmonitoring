@@ -48,7 +48,8 @@ df_infl_mx = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name
 for df_tmp in [df_sofr, df_wall, df_infl_us, df_infl_mx]:
     df_tmp["Fecha"] = pd.to_datetime(df_tmp["Fecha"], errors="coerce").dt.date
 
-        # Unir con df_economia
+# Unir con df_economia
+df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
 df_economia = df_economia.merge(df_sofr[["Fecha", "SOFR"]], on="Fecha", how="left")
 df_economia = df_economia.merge(df_infl_us[["Fecha", "Inflación USA"]], on="Fecha", how="left")
 df_economia = df_economia.merge(df_infl_mx[["Fecha", "Inflación México"]], on="Fecha", how="left")
@@ -343,10 +344,6 @@ Noticias no relacionadas con aranceles:
 
 
     # 📊 Indicadores económicos
-    # Asegurar formato de fecha correcto
-    df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
-    for df_tmp in [df_sofr, df_wall, df_infl_us, df_infl_mx]:
-        df_tmp["Fecha"] = pd.to_datetime(df_tmp["Fecha"], errors="coerce").dt.date
     # Filtrar datos económicos
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt]
 
