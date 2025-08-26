@@ -399,7 +399,8 @@ Noticias no relacionadas con aranceles:
 
         def format_signed_pct(x):
             try:
-                return f"{float(str(x).replace('%','')):+.2f}%"
+                x_clean = str(x).replace('%','').strip()
+                return f"{float(x_clean):+}" + "%"
             except:
                 return ""
 
