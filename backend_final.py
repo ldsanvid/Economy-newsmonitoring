@@ -387,17 +387,26 @@ Noticias no relacionadas con aranceles:
         ]
 
         # Formato para nuevos indicadores
-        df_economia["SOFR"] = df_economia["SOFR"].apply(lambda x: f"{float(x)*100:.2f}%" if pd.notnull(x) else "")
-        df_economia["Inflación USA"] = df_economia["Inflación USA"].apply(lambda x: f"{float(x)*100:.2f}%" if pd.notnull(x) else "")
-        df_economia["Inflación México"] = df_economia["Inflación México"].apply(lambda x: f"{float(x)*100:.2f}%" if pd.notnull(x) else "")
-
+        economia_dia["SOFR"] = economia_dia["SOFR"].apply(
+            lambda x: f"{float(str(x).replace('%','')):.2f}%" if pd.notnull(x) and str(x).strip() != '' else ""
+        )
+        economia_dia["Inflación USA"] = economia_dia["Inflación USA"].apply(
+            lambda x: f"{float(str(x).replace('%','')):.2f}%" if pd.notnull(x) and str(x).strip() != '' else ""
+        )
+        economia_dia["Inflación México"] = economia_dia["Inflación México"].apply(
+            lambda x: f"{float(str(x).replace('%','')):.2f}%" if pd.notnull(x) and str(x).strip() != '' else ""
+        )
 
         def format_signed_pct(x):
-            return f"{x:+.2%}" if pd.notnull(x) else ""
+            try:
+                return f"{float(str(x).replace('%','')):+.2f}%"
+            except:
+                return ""
 
-        df_economia["% Dow Jones"] = df_economia["% Dow Jones"].apply(format_signed_pct)
-        df_economia["% S&P500"] = df_economia["% S&P500"].apply(format_signed_pct)
-        df_economia["% Nasdaq"] = df_economia["% Nasdaq"].apply(format_signed_pct)
+        economia_dia["% Dow Jones"] = economia_dia["% Dow Jones"].apply(format_signed_pct)
+        economia_dia["% S&P500"] = economia_dia["% S&P500"].apply(format_signed_pct)
+        economia_dia["% Nasdaq"] = economia_dia["% Nasdaq"].apply(format_signed_pct)
+
 
         # Convertir a OrderedDict para frontend
         economia_dict = OrderedDict()
