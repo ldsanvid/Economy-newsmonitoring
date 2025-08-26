@@ -394,7 +394,7 @@ Noticias no relacionadas con aranceles:
         def format_porcentaje_directo(x):
             try:
                 x_clean = str(x).replace('%','').strip()
-                return f"{float(x_clean):.2f}%"
+                return f"{float(x_clean)*100:.2f}%"
             except:
                 return ""
         # Formato para nuevos indicadores
