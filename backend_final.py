@@ -593,6 +593,7 @@ def enviar_email():
     # 📰 Agregar titulares del día al cuerpo del correo
     titulares_es = df[(df["Fecha"].dt.date == fecha_dt) & (df["Idioma"].str.lower() == "es")]
     titulares_en = df[(df["Fecha"].dt.date == fecha_dt) & (df["Idioma"].str.lower().isin(["en", "ingles", "inglés"]))]
+    titulares_html = ""  # ✅ Corrección aquí
     titulares_html += ""
 
     if not titulares_es.empty:
