@@ -573,6 +573,7 @@ def enviar_email():
     data = request.get_json()
     email = data.get("email")
     fecha_str = data.get("fecha")
+    fecha_dt = pd.to_datetime(fecha_str).date()
 
     if not email or not fecha_str:
         return jsonify({"mensaje": "Debes proporcionar correo y fecha"}), 400
