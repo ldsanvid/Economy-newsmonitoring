@@ -288,7 +288,7 @@
         titularesPreguntaDiv.innerHTML = '<div class="loading" style="width:100%;height:20px;" data-label="Buscando titulares relevantes…"></div>';
       const r = await fetch(`${API_BASE}/pregunta`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },  
         body: JSON.stringify({ pregunta })
       });
       const data = await r.json();

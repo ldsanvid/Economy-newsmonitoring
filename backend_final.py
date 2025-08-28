@@ -589,7 +589,29 @@ def enviar_email():
 
     # 📊 Tabla de indicadores en HTML
     economia_dia = df_economia[df_economia["Fecha"] == pd.to_datetime(fecha_str).date()]
-    tabla_html = economia_dia.to_html(index=False, border=1) if not economia_dia.empty else "<p>No hay datos económicos</p>"
+    if not economia_dia.empty:
+        df_formateada = economia_dia.copy()
+
+            # Columnas en dólares
+        cols_dolar = ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]
+        for col in cols_dolar:
+            if col in df_formateada.columns:
+                df_formateada[col] = df_formateada[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
+
+            # Columnas en porcentaje
+        cols_porcentaje = [
+                "Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
+                "SOFR", "Inflación USA", "Inflación México",
+                "% Dow Jones", "% S&P500", "% Nasdaq"
+            ]
+        for col in cols_porcentaje:
+            if col in df_formateada.columns:
+                df_formateada[col] = df_formateada[col].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
+
+                tabla_html = df_formateada.to_html(index=False, border=1)
+            else:
+                tabla_html = "<p>No hay datos económicos</p>"
+
 
     # ---- CONFIGURACIÓN DEL CORREO ----
     remitente = "ldsantiagovidargas.93@gmail.com"
