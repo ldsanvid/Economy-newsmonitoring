@@ -667,7 +667,12 @@ def enviar_email():
     <p style="text-align: justify;">{resumen_texto}</p>
     <h3>📊 Indicadores económicos</h3>
     {tabla_html}
-    {titulares_html}
+    <h3>Principales titulares en español</h3>
+    {titulares_es}
+
+    <h3>Principales titulares en inglés</h3>
+    {titulares_en}
+
     <p>Palabras más repetidas en los titulares:</p>
     <img src="cid:nube" alt="Nube de palabras" style="width:100%; max-width:600px; margin-top:20px;" />
     <p>Adjunto encontrarás la nube de palabras en formato de imagen.</p>
