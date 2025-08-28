@@ -18,6 +18,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
+import base64
 
 # ------------------------------
 # 🔑 Configuración API y Flask
@@ -589,21 +590,34 @@ def enviar_email():
 
     # 📊 Tabla de indicadores en HTML
     # 📰 Agregar titulares del día al cuerpo del correo
-    titulares_dia = df[df["Fecha"].dt.date == pd.to_datetime(fecha_str).date()]
-    titulares_html = ""
+    titulares_es = df[(df["Fecha"].dt.date == fecha_dt) & (df["Idioma"].str.lower() == "es")]
+    titulares_en = df[(df["Fecha"].dt.date == fecha_dt) & (df["Idioma"].str.lower().isin(["en", "ingles", "inglés"]))]
+    titulares_html += ""
 
-    if not titulares_dia.empty:
-        titulares_html += "<h3>📰 Principales titulares del día</h3><ul>"
-        for _, row in titulares_dia.head(8).iterrows():
-            titulo = row["Título"]
-            enlace = row["Enlace"]
-            medio = row["Fuente"]
+    if not titulares_es.empty:
+        titulares_html += "<h3>📰 Principales titulares en español</h3><ul>"
+        for _, row in titulares_es.head(8).iterrows():
+            titulo, enlace, medio = row["Título"], row["Enlace"], row["Fuente"]
             titulares_html += f'<li><a href="{enlace}" target="_blank">{titulo}</a> — <em>{medio}</em></li>'
         titulares_html += "</ul>"
-    else:
+
+    if not titulares_en.empty:
+        titulares_html += "<h3>🗞️ Principales titulares en inglés</h3><ul>"
+        for _, row in titulares_en.head(8).iterrows():
+            titulo, enlace, medio = row["Título"], row["Enlace"], row["Fuente"]
+            titulares_html += f'<li><a href="{enlace}" target="_blank">{titulo}</a> — <em>{medio}</em></li>'
+        titulares_html += "</ul>"
+    
+    if not titulares_html:
         titulares_html = "<p>No se encontraron titulares para esta fecha.</p>"
 
-    economia_dia = df_economia[df_economia["Fecha"] == pd.to_datetime(fecha_str).date()]
+    fecha_dt = pd.to_datetime(fecha_str).date()
+    economia_dia = df_economia[df_economia["Fecha"] == fecha_dt].copy()
+    # Si la inflación USA está vacía ese día, usar la más reciente disponible
+    if "Inflación USA" in economia_dia.columns and economia_dia["Inflación USA"].isnull().all():
+        inflacion_usa_reciente = df_economia["Inflación USA"].dropna().iloc[-1]
+        economia_dia["Inflación USA"] = inflacion_usa_reciente
+    
     if not economia_dia.empty:
         df_formateada = economia_dia.copy()
 
@@ -640,7 +654,7 @@ def enviar_email():
 
     cuerpo = f"""
     <h2>Resumen de noticias del {fecha_str}</h2>
-    <p>{resumen_texto}</p>
+    <p style="text-align: justify;">{resumen_texto}</p>
     <h3>📊 Indicadores económicos</h3>
     {tabla_html}
     {titulares_html}
@@ -650,13 +664,12 @@ def enviar_email():
     msg.attach(MIMEText(cuerpo, "html"))
 
     # Adjuntar nube
+    imagen_html = ""
     if os.path.exists(archivo_nube):
         with open(archivo_nube, "rb") as f:
-            parte = MIMEBase("application", "octet-stream")
-            parte.set_payload(f.read())
-        encoders.encode_base64(parte)
-        parte.add_header("Content-Disposition", f"attachment; filename=nube_{fecha_str}.png")
-        msg.attach(parte)
+            imagen_bytes = f.read()
+            imagen_b64 = base64.b64encode(imagen_bytes).decode("utf-8")
+            imagen_html = f'<p><img src="data:image/png;base64,{imagen_b64}" alt="Nube de palabras" width="600"/></p>'
 
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)

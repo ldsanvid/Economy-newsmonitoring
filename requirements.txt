@@ -10,4 +10,5 @@ openpyxl
 scikit-learn
 dateparser
 flask_cors
+base64
 gunicorn
