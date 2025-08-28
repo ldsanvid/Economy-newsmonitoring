@@ -17,6 +17,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
+from email.mime.image import MIMEImage
 from email import encoders
 import base64
 
@@ -593,22 +594,27 @@ def enviar_email():
     # 📰 Agregar titulares del día al cuerpo del correo
     titulares_es = df[(df["Fecha"].dt.date == fecha_dt) & (df["Idioma"].str.lower() == "es")]
     titulares_en = df[(df["Fecha"].dt.date == fecha_dt) & (df["Idioma"].str.lower().isin(["en", "ingles", "inglés"]))]
-    titulares_html = ""  # ✅ Corrección aquí
-    titulares_html += ""
-
+    # 📰 Titulares por idioma
+    titulares_es_html = ""
     if not titulares_es.empty:
-        titulares_html += "<h3>📰 Principales titulares en español</h3><ul>"
+        titulares_es_html += "<h3>📰 Principales titulares en español</h3><ul>"
         for _, row in titulares_es.head(8).iterrows():
-            titulo, enlace, medio = row["Título"], row["Enlace"], row["Fuente"]
-            titulares_html += f'<li><a href="{enlace}" target="_blank">{titulo}</a> — <em>{medio}</em></li>'
-        titulares_html += "</ul>"
+            titulo = row["Título"]
+            enlace = row["Enlace"]
+            medio = row["Fuente"]
+            titulares_es_html += f'<li><a href="{enlace}" target="_blank">{titulo}</a> — <em>{medio}</em></li>'
+        titulares_es_html += "</ul>"
 
+    titulares_en_html = ""
     if not titulares_en.empty:
-        titulares_html += "<h3>🗞️ Principales titulares en inglés</h3><ul>"
+        titulares_en_html += "<h3>📰 Principales titulares en inglés</h3><ul>"
         for _, row in titulares_en.head(8).iterrows():
-            titulo, enlace, medio = row["Título"], row["Enlace"], row["Fuente"]
-            titulares_html += f'<li><a href="{enlace}" target="_blank">{titulo}</a> — <em>{medio}</em></li>'
-        titulares_html += "</ul>"
+            titulo = row["Título"]
+            enlace = row["Enlace"]
+            medio = row["Fuente"]
+            titulares_en_html += f'<li><a href="{enlace}" target="_blank">{titulo}</a> — <em>{medio}</em></li>'
+        titulares_en_html += "</ul>"
+
     
     if not titulares_html:
         titulares_html = "<p>No se encontraron titulares para esta fecha.</p>"
@@ -659,11 +665,22 @@ def enviar_email():
     <p style="text-align: justify;">{resumen_texto}</p>
     <h3>📊 Indicadores económicos</h3>
     {tabla_html}
-    {titulares_html}
+    {titulares_es_html}
+    {titulares_en_html}
+    <p>Palabras más repetidas en los titulares:</p>
+    <img src="cid:nube" alt="Nube de palabras" style="width:100%; max-width:600px; margin-top:20px;" />
     <p>Adjunto encontrarás la nube de palabras en formato de imagen.</p>
     """
 
     msg.attach(MIMEText(cuerpo, "html"))
+    # 📎 Incrustar imagen de nube de palabras en el cuerpo del correo
+    if os.path.exists(archivo_nube):
+        with open(archivo_nube, "rb") as img_file:
+            imagen = MIMEImage(img_file.read())
+            imagen.add_header("Content-ID", "<nube>")
+            imagen.add_header("Content-Disposition", "inline", filename=archivo_nube)
+            msg.attach(imagen)
+
 
     # Adjuntar nube
     imagen_html = ""
