@@ -588,6 +588,21 @@ def enviar_email():
     archivo_nube = os.path.join("nubes", f"nube_{fecha_str}.png")
 
     # 📊 Tabla de indicadores en HTML
+    # 📰 Agregar titulares del día al cuerpo del correo
+    titulares_dia = df[df["Fecha"].dt.date == pd.to_datetime(fecha_str).date()]
+    titulares_html = ""
+
+    if not titulares_dia.empty:
+        titulares_html += "<h3>📰 Principales titulares del día</h3><ul>"
+        for _, row in titulares_dia.head(8).iterrows():
+            titulo = row["Título"]
+            enlace = row["Enlace"]
+            medio = row["Fuente"]
+            titulares_html += f'<li><a href="{enlace}" target="_blank">{titulo}</a> — <em>{medio}</em></li>'
+        titulares_html += "</ul>"
+    else:
+        titulares_html = "<p>No se encontraron titulares para esta fecha.</p>"
+
     economia_dia = df_economia[df_economia["Fecha"] == pd.to_datetime(fecha_str).date()]
     if not economia_dia.empty:
         df_formateada = economia_dia.copy()
@@ -626,10 +641,12 @@ def enviar_email():
     cuerpo = f"""
     <h2>Resumen de noticias del {fecha_str}</h2>
     <p>{resumen_texto}</p>
-    <h3>Indicadores económicos</h3>
+    <h3>📊 Indicadores económicos</h3>
     {tabla_html}
+    {titulares_html}
     <p>Adjunto encontrarás la nube de palabras en formato de imagen.</p>
     """
+
     msg.attach(MIMEText(cuerpo, "html"))
 
     # Adjuntar nube
