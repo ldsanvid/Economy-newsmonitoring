@@ -598,24 +598,22 @@ def enviar_email():
 
     # Titulares en español
     if not titulares_es.empty:
-        titulares_html += "<h3>📰 Principales titulares en español</h3><ul>"
-        for _, row in titulares_es.head(8).iterrows():
-            titulo = row["Título"]
+        titulares_html += "<h3>📌 Principales titulares en español</h3><ul>"
+        for _, row in titulares_es.iterrows():
+            fuente = row["Fuente"]
             enlace = row["Enlace"]
-            medio = row["Fuente"]
-            titulares_html += f'<li><a href="{enlace}" target="_blank">{titulo}</a> — <em>{medio}</em></li>'
+            titulo = row["Título"]
+            titulares_html += f"<li>{titulo} — <i>{fuente}</i></li>"
         titulares_html += "</ul>"
-
     # Titulares en inglés
     if not titulares_en.empty:
-        titulares_html += "<h3>🌎 Principales titulares en inglés</h3><ul>"
-        for _, row in titulares_en.head(8).iterrows():
-            titulo = row["Título"]
+        titulares_html += "<h3>🌐 Principales titulares en inglés</h3><ul>"
+        for _, row in titulares_en.iterrows():
+            fuente = row["Fuente"]
             enlace = row["Enlace"]
-            medio = row["Fuente"]
-            titulares_html += f'<li><a href="{enlace}" target="_blank">{titulo}</a> — <em>{medio}</em></li>'
+            titulo = row["Título"]
+            titulares_html += f"<li>{titulo} — <i>{fuente}</i></li>"
         titulares_html += "</ul>"
-
     # Si no hay titulares de ningún tipo
     if not titulares_html:
         titulares_html = "<p>No se encontraron titulares relevantes para esta fecha.</p>"
@@ -667,13 +665,10 @@ def enviar_email():
     <p style="text-align: justify;">{resumen_texto}</p>
     <h3>📊 Indicadores económicos</h3>
     {tabla_html}
-    <h3>Principales titulares en español</h3>
-    {titulares_es}
+ 
+    {titulares_html}
 
-    <h3>Principales titulares en inglés</h3>
-    {titulares_en}
-
-    <p>Palabras más repetidas en los titulares:</p>
+    <h2>Palabras más repetidas en los titulares:</h2>
     <img src="cid:nube" alt="Nube de palabras" style="width:100%; max-width:600px; margin-top:20px;" />
     <p>Adjunto encontrarás la nube de palabras en formato de imagen.</p>
     """
