@@ -602,7 +602,7 @@ def enviar_email():
     fecha_str = data.get("fecha")
     fecha_dt = pd.to_datetime(fecha_str).date()
 
-    resumen_response = requests.post("http://localhost:5000/resumen", json={"fecha": fecha_str})
+    resumen_response = requests.post("https://tc-backend-tf9q.onrender.com/resumen", json={"fecha": fecha_str})
     if resumen_response.status_code == 200:
         resumen_data = resumen_response.json()
         titulares_info = resumen_data.get("titulares", [])
