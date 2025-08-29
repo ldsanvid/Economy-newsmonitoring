@@ -590,10 +590,22 @@ def enviar_email():
     # ☁️ Nube
     archivo_nube = os.path.join("nubes", f"nube_{fecha_str}.png")
 
-# 📰 Titulares por idioma (unificados en una sola variable HTML)
-    # 📰 TITULARES EN ESPAÑOL E INGLÉS (8 sin repetir medio)
-    titulares_es = df[(df["Fecha"].dt.date == fecha_dt) & (df["Idioma"].str.lower() == "es")]
-    titulares_en = df[(df["Fecha"].dt.date == fecha_dt) & (df["Idioma"].str.lower().isin(["en", "ingles", "inglés"]))]
+
+# 📰 TITULARES EN ESPAÑOL E INGLÉS (8 sin repetir medio)
+    def _to_lower_safe(s):
+        try: return str(s).strip().lower()
+        except: return ""
+
+    df["Idioma_safe"] = df["Idioma"].apply(_to_lower_safe)
+
+    titulares_es = df[
+        (df["Fecha"].dt.date == fecha_dt) & 
+        (~df["Idioma_safe"].isin(["en", "ingles", "inglés"]))
+    ]
+    titulares_en = df[
+        (df["Fecha"].dt.date == fecha_dt) & 
+        (df["Idioma_safe"].isin(["en", "ingles", "inglés"]))
+]
 
     # --- Español ---
     usados_medios_es = set()
@@ -676,7 +688,7 @@ def enviar_email():
 
     {titulares_en_html}
 
-    <h3>☁️ Nube de Palabras más repetidas en los titulares</h3>
+    <h3>☁️ Nube de palabras más repetidas en los titulares</h3>
     <img src="cid:nube" alt="Nube de palabras" style="width:100%; max-width:600px; margin-top:20px;" />
     <p>Adjunto encontrarás la nube de palabras en formato de imagen.</p>
     """
