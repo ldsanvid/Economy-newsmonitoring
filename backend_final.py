@@ -591,32 +591,38 @@ def enviar_email():
     archivo_nube = os.path.join("nubes", f"nube_{fecha_str}.png")
 
 # 📰 Titulares por idioma (unificados en una sola variable HTML)
-    titulares_html = ""  # Inicializamos la variable
-
+    # 📰 TITULARES EN ESPAÑOL E INGLÉS (8 sin repetir medio)
     titulares_es = df[(df["Fecha"].dt.date == fecha_dt) & (df["Idioma"].str.lower() == "es")]
     titulares_en = df[(df["Fecha"].dt.date == fecha_dt) & (df["Idioma"].str.lower().isin(["en", "ingles", "inglés"]))]
 
-    # Titulares en español
-    if not titulares_es.empty:
-        titulares_html += "<h3>📌 Principales titulares en español</h3><ul>"
-        for _, row in titulares_es.iterrows():
-            fuente = row["Fuente"]
+    # --- Español ---
+    usados_medios_es = set()
+    titulares_es_html = "<h3>📰 Principales titulares en español</h3><ul>"
+    for _, row in titulares_es.iterrows():
+        medio = row["Fuente"]
+        if medio not in usados_medios_es:
             enlace = row["Enlace"]
             titulo = row["Título"]
-            titulares_html += f"<li>{titulo} — <i>{fuente}</i></li>"
-        titulares_html += "</ul>"
-    # Titulares en inglés
-    if not titulares_en.empty:
-        titulares_html += "<h3>🌐 Principales titulares en inglés</h3><ul>"
-        for _, row in titulares_en.iterrows():
-            fuente = row["Fuente"]
+            titulares_es_html += f"<li><a href='{enlace}'>{titulo}</a> — <em>{medio}</em></li>"
+            usados_medios_es.add(medio)
+        if len(usados_medios_es) >= 8:
+            break
+    titulares_es_html += "</ul>"
+
+    # --- Inglés ---
+    usados_medios_en = set(usados_medios_es)  # hereda los usados en español
+    titulares_en_html = "<h3>🌎 Principales titulares en inglés</h3><ul>"
+    for _, row in titulares_en.iterrows():
+        medio = row["Fuente"]
+        if medio not in usados_medios_en:
             enlace = row["Enlace"]
             titulo = row["Título"]
-            titulares_html += f"<li>{titulo} — <i>{fuente}</i></li>"
-        titulares_html += "</ul>"
-    # Si no hay titulares de ningún tipo
-    if not titulares_html:
-        titulares_html = "<p>No se encontraron titulares relevantes para esta fecha.</p>"
+            titulares_en_html += f"<li><a href='{enlace}'>{titulo}</a> — <em>{medio}</em></li>"
+            usados_medios_en.add(medio)
+        if len(usados_medios_en) - len(usados_medios_es) >= 8:
+            break
+    titulares_en_html += "</ul>"
+
 
 
     fecha_dt = pd.to_datetime(fecha_str).date()
@@ -666,9 +672,11 @@ def enviar_email():
     <h3>📊 Indicadores económicos</h3>
     {tabla_html}
  
-    {titulares_html}
+    {titulares_es_html}
 
-    <h2>Palabras más repetidas en los titulares:</h2>
+    {titulares_en_html}
+
+    <h3>☁️ Nube de Palabras más repetidas en los titulares</h3>
     <img src="cid:nube" alt="Nube de palabras" style="width:100%; max-width:600px; margin-top:20px;" />
     <p>Adjunto encontrarás la nube de palabras en formato de imagen.</p>
     """
