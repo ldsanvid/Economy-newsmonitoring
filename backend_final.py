@@ -625,7 +625,7 @@ def enviar_email():
     archivo_nube = os.path.join("nubes", f"nube_{fecha_str}.png")
 
     titulares_es_html = construir_html_titulares(titulares_info, idioma="es", usados_medios=set())
-    titulares_en_html = construir_html_titulares(titulares_info, idioma="en", usados_medios=set())
+    titulares_en_html = construir_html_titulares(titulares_info_en, idioma="en", usados_medios=set())
 
     fecha_dt = pd.to_datetime(fecha_str).date()
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt].copy()
