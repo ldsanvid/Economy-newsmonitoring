@@ -609,7 +609,7 @@ def enviar_email():
         titulares_info_en = resumen_data.get("titulares_en", [])
     else:
         return jsonify({"mensaje": f"No se pudo obtener resumen de {fecha_str}"}), 500
-
+    
     if not email or not fecha_str:
         return jsonify({"mensaje": "Debes proporcionar correo y fecha"}), 400
 
