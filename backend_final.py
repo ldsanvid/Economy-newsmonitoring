@@ -20,6 +20,7 @@ from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email import encoders
 import base64
+import requests
 
 # ------------------------------
 # 🔑 Configuración API y Flask
@@ -239,6 +240,7 @@ def generar_nube(titulos, archivo_salida):
 def resumen():
     data = request.get_json()
     fecha_str = data.get("fecha")
+    
     if not fecha_str:
         return jsonify({"error": "Debe especificar una fecha"}), 400
 
@@ -440,7 +442,8 @@ Noticias no relacionadas con aranceles:
                 titulares_info.append({
                     "titulo": row["Título"],
                     "medio": medio,
-                    "enlace": row["Enlace"]
+                    "enlace": row["Enlace"],
+                    "idioma": "es"
                 })
                 usados_medios.add(medio)
                 added += 1
@@ -568,6 +571,29 @@ def pregunta():
         "respuesta": respuesta_gpt,
         "titulares_usados": titulares_info
     })
+
+def construir_html_titulares(titulares_info, idioma, usados_medios=None):
+    if usados_medios is None:
+        usados_medios = set()
+    html = f"<h3>{'🇲🇽 Principales titulares en español' if idioma == 'es' else '🌐 Principales titulares en inglés'}</h3><ul>"
+    count = 0
+    for titular in titulares_info:
+        if not all(k in titular for k in ["titulo", "medio", "enlace", "idioma"]):
+            continue
+        if idioma == "es" and titular["idioma"] != "es":
+            continue
+        if idioma == "en" and titular["idioma"] != "en":
+            continue
+        if titular["medio"] in usados_medios:
+            continue
+        html += f"<li><a href='{titular['enlace']}'>{titular['titulo']}</a> — <em>{titular['medio']}</em></li>"
+        usados_medios.add(titular["medio"])
+        count += 1
+        if count >= 8:
+            break
+    html += "</ul>"
+    return html
+
 #correoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 @app.route("/enviar_email", methods=["POST"])
 def enviar_email():
@@ -575,6 +601,14 @@ def enviar_email():
     email = data.get("email")
     fecha_str = data.get("fecha")
     fecha_dt = pd.to_datetime(fecha_str).date()
+
+    resumen_response = requests.post("http://localhost:5000/resumen", json={"fecha": fecha_str})
+    if resumen_response.status_code == 200:
+        resumen_data = resumen_response.json()
+        titulares_info = resumen_data.get("titulares", [])
+        titulares_info_en = resumen_data.get("titulares_en", [])
+    else:
+        return jsonify({"mensaje": f"No se pudo obtener resumen de {fecha_str}"}), 500
 
     if not email or not fecha_str:
         return jsonify({"mensaje": "Debes proporcionar correo y fecha"}), 400
@@ -590,52 +624,8 @@ def enviar_email():
     # ☁️ Nube
     archivo_nube = os.path.join("nubes", f"nube_{fecha_str}.png")
 
-
-# 📰 TITULARES EN ESPAÑOL E INGLÉS (8 sin repetir medio)
-    def _to_lower_safe(s):
-        try: return str(s).strip().lower()
-        except: return ""
-
-    df["Idioma_safe"] = df["Idioma"].apply(_to_lower_safe)
-
-    titulares_es = df[
-        (df["Fecha"].dt.date == fecha_dt) & 
-        (~df["Idioma_safe"].isin(["en", "ingles", "inglés"]))
-    ]
-    titulares_en = df[
-        (df["Fecha"].dt.date == fecha_dt) & 
-        (df["Idioma_safe"].isin(["en", "ingles", "inglés"]))
-]
-
-    # --- Español ---
-    usados_medios_es = set()
-    titulares_es_html = "<h3>📰 Principales titulares en español</h3><ul>"
-    for _, row in titulares_es.iterrows():
-        medio = row["Fuente"]
-        if medio not in usados_medios_es:
-            enlace = row["Enlace"]
-            titulo = row["Título"]
-            titulares_es_html += f"<li><a href='{enlace}'>{titulo}</a> — <em>{medio}</em></li>"
-            usados_medios_es.add(medio)
-        if len(usados_medios_es) >= 8:
-            break
-    titulares_es_html += "</ul>"
-
-    # --- Inglés ---
-    usados_medios_en = set(usados_medios_es)  # hereda los usados en español
-    titulares_en_html = "<h3>🌎 Principales titulares en inglés</h3><ul>"
-    for _, row in titulares_en.iterrows():
-        medio = row["Fuente"]
-        if medio not in usados_medios_en:
-            enlace = row["Enlace"]
-            titulo = row["Título"]
-            titulares_en_html += f"<li><a href='{enlace}'>{titulo}</a> — <em>{medio}</em></li>"
-            usados_medios_en.add(medio)
-        if len(usados_medios_en) - len(usados_medios_es) >= 8:
-            break
-    titulares_en_html += "</ul>"
-
-
+    titulares_es_html = construir_html_titulares(titulares_info, idioma="es", usados_medios=set())
+    titulares_en_html = construir_html_titulares(titulares_info, idioma="en", usados_medios=set())
 
     fecha_dt = pd.to_datetime(fecha_str).date()
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt].copy()
