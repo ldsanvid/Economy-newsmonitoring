@@ -624,7 +624,13 @@ def enviar_email():
     # ☁️ Nube
     archivo_nube = os.path.join("nubes", f"nube_{fecha_str}.png")
 
-    titulares_es_html = construir_html_titulares(titulares_info, idioma="es", usados_medios=set())
+    # Titulares en español directamente del resumen, sin reordenar ni filtrar
+    titulares_es_html = "<h3>🇲🇽 Principales titulares en español</h3><ul>"
+    for t in titulares_info:
+        if all(k in t for k in ["titulo", "medio", "enlace"]) and t.get("idioma", "es") == "es":
+            titulares_es_html += f"<li><a href='{t['enlace']}'>{t['titulo']}</a> — <em>{t['medio']}</em></li>"
+    titulares_es_html += "</ul>"
+
     titulares_en_html = construir_html_titulares(titulares_info_en, idioma="en", usados_medios=set())
 
     fecha_dt = pd.to_datetime(fecha_str).date()
