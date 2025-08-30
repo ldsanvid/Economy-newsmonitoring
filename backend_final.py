@@ -618,49 +618,36 @@ def enviar_email():
     # ☁️ Nube
     archivo_nube = os.path.join("nubes", f"nube_{fecha_str}.png")
 
-    # Titulares en español directamente del resumen, sin reordenar ni filtrar
-    titulares_es_html = "<h3>🇲🇽 Principales titulares en español</h3><ul>"
-    for t in titulares_info:
-        if all(k in t for k in ["titulo", "medio", "enlace"]) and t.get("idioma", "es") == "es":
-            titulares_es_html += f"<li><a href='{t['enlace']}'>{t['titulo']}</a> — <em>{t['medio']}</em></li>"
-    titulares_es_html += "</ul>"
-
-    titulares_en_html = construir_html_titulares(titulares_info_en, idioma="en", usados_medios=set())
-
+    # 📊 Indicadores económicos
     fecha_dt = pd.to_datetime(fecha_str).date()
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt].copy()
-    # Si la inflación USA está vacía ese día, usar la más reciente disponible
     if "Inflación USA" in economia_dia.columns and economia_dia["Inflación USA"].isnull().all():
         inflacion_usa_reciente = df_economia["Inflación USA"].dropna().iloc[-1]
         economia_dia["Inflación USA"] = inflacion_usa_reciente
     
     if not economia_dia.empty:
         df_formateada = economia_dia.copy()
-
-            # Columnas en dólares
+        # Columnas en dólares
         cols_dolar = ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]
         for col in cols_dolar:
             if col in df_formateada.columns:
                 df_formateada[col] = df_formateada[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
-
-            # Columnas en porcentaje
+        # Columnas en porcentaje
         cols_porcentaje = [
-                "Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
-                "SOFR", "Inflación USA", "Inflación México",
-                "% Dow Jones", "% S&P500", "% Nasdaq"
-            ]
+            "Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
+            "SOFR", "Inflación USA", "Inflación México",
+            "% Dow Jones", "% S&P500", "% Nasdaq"
+        ]
         for col in cols_porcentaje:
             if col in df_formateada.columns:
                 df_formateada[col] = df_formateada[col].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
-
-                tabla_html = df_formateada.to_html(index=False, border=1)
-            else:
-                tabla_html = "<p>No hay datos económicos</p>"
-
+        tabla_html = df_formateada.to_html(index=False, border=1)
+    else:
+        tabla_html = "<p>No hay datos económicos</p>"
 
     # ---- CONFIGURACIÓN DEL CORREO ----
     remitente = "ldsantiagovidargas.93@gmail.com"
-    password = os.environ.get("GMAIL_PASSWORD_APP")  # contraseña de aplicación guardada en Render
+    password = os.environ.get("GMAIL_PASSWORD_APP")
     destinatario = email
 
     msg = MIMEMultipart()
@@ -668,38 +655,47 @@ def enviar_email():
     msg["To"] = destinatario
     msg["Subject"] = f"Resumen de noticias {fecha_str}"
 
+    # 📧 Plantilla estilo frontend
     cuerpo = f"""
-    <h2>Resumen de noticias del {fecha_str}</h2>
-    <p style="text-align: justify;">{resumen_texto}</p>
-    <h3>📊 Indicadores económicos</h3>
-    {tabla_html}
- 
-    {titulares_es_html}
+    <div style="font-family:Montserrat,Arial,sans-serif; max-width:800px; margin:auto; background:#f9f9f9; padding:20px; border-radius:12px; border:1px solid #ddd;">
+      <h2 style="font-size:1.4rem; font-weight:700; margin-bottom:14px; color:#111;">
+        📅 Resumen diario de noticias — {fecha_str}
+      </h2>
 
-    {titulares_en_html}
+      <div style="background:#fff; border:1px solid #ddd; border-radius:12px; padding:20px; margin-bottom:20px;">
+        <p style="color:#555; line-height:1.7; text-align:justify;">{resumen_texto}</p>
+      </div>
 
-    <h3>☁️ Nube de palabras más repetidas en los titulares</h3>
-    <img src="cid:nube" alt="Nube de palabras" style="width:100%; max-width:600px; margin-top:20px;" />
-    <p>Adjunto encontrarás la nube de palabras en formato de imagen.</p>
+      <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">📊 Indicadores económicos</h3>
+      {tabla_html}
+
+      <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">🇲🇽 Principales titulares en español</h3>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
+        {''.join([f"<div style='padding:10px 12px; border:1px solid #ddd; border-radius:12px; background:#fff;'><a href='{t['enlace']}' style='color:#007BFF; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#555;'>• {t['medio']}</small></div>" for t in titulares_info if t.get('idioma','es')=='es'])}
+      </div>
+
+      <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">🌐 Principales titulares en inglés</h3>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
+        {''.join([f"<div style='padding:10px 12px; border:1px solid #ddd; border-radius:12px; background:#fff;'><a href='{t['enlace']}' style='color:#007BFF; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#555;'>• {t['medio']}</small></div>" for t in titulares_info_en])}
+      </div>
+
+      <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">☁️ Nube de palabras</h3>
+      <div style="text-align:center; margin-top:12px;">
+        <img src="cid:nube" alt="Nube de palabras" style="width:100%; max-width:600px; border-radius:12px; border:1px solid #ddd;" />
+        <p style="color:#555; font-size:.9rem;">Adjunto encontrarás la nube de palabras en formato de imagen.</p>
+      </div>
+    </div>
     """
 
     msg.attach(MIMEText(cuerpo, "html"))
-    # 📎 Incrustar imagen de nube de palabras en el cuerpo del correo
+
+    # 📎 Adjuntar nube inline
     if os.path.exists(archivo_nube):
         with open(archivo_nube, "rb") as img_file:
             imagen = MIMEImage(img_file.read())
             imagen.add_header("Content-ID", "<nube>")
             imagen.add_header("Content-Disposition", "inline", filename=archivo_nube)
             msg.attach(imagen)
-
-
-    # Adjuntar nube
-    imagen_html = ""
-    if os.path.exists(archivo_nube):
-        with open(archivo_nube, "rb") as f:
-            imagen_bytes = f.read()
-            imagen_b64 = base64.b64encode(imagen_bytes).decode("utf-8")
-            imagen_html = f'<p><img src="data:image/png;base64,{imagen_b64}" alt="Nube de palabras" width="600"/></p>'
 
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)
