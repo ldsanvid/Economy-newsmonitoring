@@ -452,7 +452,8 @@ Noticias no relacionadas con aranceles:
                 titulares_info_en.append({
                     "titulo": row["Título"],
                     "medio": medio,
-                    "enlace": row["Enlace"]
+                    "enlace": row["Enlace"],
+                    "idioma": "en"
                 })
                 usados_medios_en.add(medio)
             if len(titulares_info_en) >= 8:
