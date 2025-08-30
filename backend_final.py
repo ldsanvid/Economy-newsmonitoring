@@ -235,29 +235,20 @@ def generar_nube(titulos, archivo_salida):
     ).generate(texto)
     wc.to_file(archivo_salida)
 
-#/resumen!!!!!!!
-@app.route("/resumen", methods=["POST"])
-def resumen():
-    data = request.get_json()
-    fecha_str = data.get("fecha")
-    
-    if not fecha_str:
-        return jsonify({"error": "Debe especificar una fecha"}), 400
-
-    # Filtrar noticias de la fecha
+def generar_resumen_y_datos(fecha_str):
     fecha_dt = pd.to_datetime(fecha_str, errors="coerce").date()
     noticias_dia = df[df["Fecha"].dt.date == fecha_dt]
     if noticias_dia.empty:
-        return jsonify({"error": f"No hay noticias para la fecha {fecha_str}"}), 404
+        return {"error": f"No hay noticias para la fecha {fecha_str}"}
 
-    # Clasificación por cobertura
+    # --- Clasificación por cobertura ---
     estados_mexico = ["aguascalientes", "baja california", "baja california sur", "campeche", "cdmx",
         "coahuila", "colima", "chiapas", "chihuahua", "ciudad de méxico", "durango",
         "guanajuato", "guerrero", "hidalgo", "jalisco", "méxico", "michoacán", "morelos",
         "nayarit", "nuevo león", "oaxaca", "puebla", "querétaro", "quintana roo",
         "san luis potosí", "sinaloa", "sonora", "tabasco", "tamaulipas", "tlaxcala",
         "veracruz", "yucatán", "zacatecas"]
-
+    
     noticias_locales = noticias_dia[noticias_dia["Cobertura"].str.lower().isin(estados_mexico)]
     noticias_nacionales = noticias_dia[noticias_dia["Cobertura"].str.lower() == "nacional"]
     noticias_internacionales = noticias_dia[
@@ -265,7 +256,7 @@ def resumen():
         ~noticias_dia.index.isin(noticias_nacionales.index)
     ]
     noticias_otras = noticias_dia[noticias_dia["Término"].str.lower() != "aranceles"]
-
+   
     def _to_lower_safe(s):
         try: return str(s).strip().lower()
         except: return ""
@@ -321,7 +312,7 @@ Noticias internacionales:
 Noticias no relacionadas con aranceles:
 {contexto_otros_temas}
     """
-
+ # --- Resumen GPT o cache ---
     resumen_file = f"resumen_{fecha_str}.txt"
     if os.path.exists(resumen_file):
         with open(resumen_file, "r", encoding="utf-8") as f:
@@ -340,20 +331,13 @@ Noticias no relacionadas con aranceles:
         with open(resumen_file, "w", encoding="utf-8") as f:
             f.write(resumen_texto)
 
-# ☁️ Generar nube de palabras
-    os.makedirs("nubes", exist_ok=True)  # crea carpeta si no existe
+    # --- Generar nube ---
+    os.makedirs("nubes", exist_ok=True)
     archivo_nube = f"nube_{fecha_str}.png"
     archivo_nube_path = os.path.join("nubes", archivo_nube)
     generar_nube(noticias_dia["Título"].tolist(), archivo_nube_path)
-    # 💾 Guardar resumen en carpeta "resumenes"
-    os.makedirs("resumenes", exist_ok=True)
-    archivo_resumen = f"resumen_{fecha_str}.txt"
-    archivo_resumen_path = os.path.join("resumenes", archivo_resumen)
-    with open(archivo_resumen_path, "w", encoding="utf-8") as f:
-        f.write(resumen_texto)
 
-
-    # 📊 Indicadores económicos
+        # 📊 Indicadores económicos
     # Filtrar datos económicos
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt]
     # Si la inflación USA está vacía en el día seleccionado, usar el valor más reciente disponible
@@ -484,6 +468,20 @@ Noticias no relacionadas con aranceles:
         "titulares_en": titulares_info_en  # 👈 nuevo bloque de titulares en inglés
     })
 
+@app.route("/resumen", methods=["POST"])
+def resumen():
+    data = request.get_json()
+    fecha_str = data.get("fecha")
+    if not fecha_str:
+        return jsonify({"error": "Debe especificar una fecha"}), 400
+
+    resultado = generar_resumen_y_datos(fecha_str)
+
+    if "error" in resultado:
+        return jsonify(resultado), 404
+
+    return jsonify(resultado)
+
 
 #pregunta!!!!    
 @app.route("/pregunta", methods=["POST"])
@@ -602,24 +600,19 @@ def enviar_email():
     fecha_str = data.get("fecha")
     fecha_dt = pd.to_datetime(fecha_str).date()
 
-    resumen_response = requests.post("https://tc-backend-tf9q.onrender.com/resumen", json={"fecha": fecha_str})
-    if resumen_response.status_code == 200:
-        resumen_data = resumen_response.json()
-        titulares_info = resumen_data.get("titulares", [])
-        titulares_info_en = resumen_data.get("titulares_en", [])
-    else:
-        return jsonify({"mensaje": f"No se pudo obtener resumen de {fecha_str}"}), 500
-    
-    if not email or not fecha_str:
-        return jsonify({"mensaje": "Debes proporcionar correo y fecha"}), 400
+    resultado = generar_resumen_y_datos(fecha_str)
+    if "error" in resultado:
+        return jsonify({"mensaje": resultado["error"]}), 404
 
-    # 📝 Resumen guardado
-    archivo_resumen = os.path.join("resumenes", f"resumen_{fecha_str}.txt")
-    if not os.path.exists(archivo_resumen):
-        return jsonify({"mensaje": f"No hay resumen disponible para {fecha_str}"}), 404
+    titulares_info = resultado.get("titulares", [])
+    titulares_info_en = resultado.get("titulares_en", [])
+    resumen_texto = resultado.get("resumen", "")
 
-    with open(archivo_resumen, "r", encoding="utf-8") as f:
-        resumen_texto = f.read()
+    if not resumen_texto:
+        archivo_resumen = os.path.join("resumenes", f"resumen_{fecha_str}.txt")
+        if os.path.exists(archivo_resumen):
+            with open(archivo_resumen, "r", encoding="utf-8") as f:
+                resumen_texto = f.read()
 
     # ☁️ Nube
     archivo_nube = os.path.join("nubes", f"nube_{fecha_str}.png")
