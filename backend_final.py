@@ -459,7 +459,7 @@ Noticias no relacionadas con aranceles:
                 break
 
 
-    return jsonify({
+    return ({
         "resumen": resumen_texto,
         "nube_url": f"/nube/{archivo_nube}",
         "economia": [economia_dict],
