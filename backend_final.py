@@ -626,24 +626,26 @@ def enviar_email():
         economia_dia["Inflación USA"] = inflacion_usa_reciente
     
     if not economia_dia.empty:
-        df_formateada = economia_dia.copy()
-        # Columnas en dólares
-        cols_dolar = ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]
-        for col in cols_dolar:
-            if col in df_formateada.columns:
-                df_formateada[col] = df_formateada[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
-        # Columnas en porcentaje
-        cols_porcentaje = [
-            "Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
-            "SOFR", "Inflación USA", "Inflación México",
-            "% Dow Jones", "% S&P500", "% Nasdaq"
-        ]
-        for col in cols_porcentaje:
-            if col in df_formateada.columns:
-                df_formateada[col] = df_formateada[col].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
-        tabla_html = df_formateada.to_html(index=False, border=1)
+        economia_dict = OrderedDict()
+        for col in economia_dia.columns[1:]:
+            economia_dict[col] = economia_dia.iloc[0][col]
+
+        orden_columnas = list(economia_dict.keys())
+
+    # Construcción manual de las tarjetas de indicadores
+        tarjetas_html = "<div style='display:flex; flex-wrap:wrap; gap:12px; margin-top:10px;'>"
+        for col in orden_columnas:
+            valor = economia_dict.get(col, "")
+            tarjetas_html += f"""
+            <div style="flex:1 1 calc(33% - 12px); background:#fff; border:1px solid #ddd; border-radius:12px; padding:12px; text-align:center; min-width:150px;">
+                <div style="font-size:0.85rem; color:#7D7B78; margin-bottom:6px;">{col}</div>
+                <div style="font-size:1.1rem; font-weight:700; color:#111;">{valor}</div>
+            </div>
+            """
+        tarjetas_html += "</div>"
     else:
-        tabla_html = "<p>No hay datos económicos</p>"
+        tarjetas_html = "<p>No hay datos económicos</p>"
+
 
     # ---- CONFIGURACIÓN DEL CORREO ----
     remitente = "ldsantiagovidargas.93@gmail.com"
@@ -662,7 +664,7 @@ def enviar_email():
       
       <!-- Header con logos -->
       <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; margin-bottom:20px; border-bottom:2px solid #e5e7eb;">
-        <img src="cid:logo_cliente" alt="Cliente" style="height:40px;">
+        <img src="cid:logo" alt="Cliente" style="height:40px;">
         <div style="font-weight:700; font-size:1.2rem; color:#111;">
           Monitoreo<span style="color:#FFB429;">+</span>
         </div>
@@ -678,18 +680,18 @@ def enviar_email():
 
       <!-- Indicadores económicos -->
       <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">📊 Indicadores económicos</h3>
-      {tabla_html}
+      {tarjetas_html}
 
       <!-- Titulares en español -->
       <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">🇲🇽 Principales titulares en español</h3>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
-        {''.join([f"<div style='padding:10px; border:1px solid #ddd; border-radius:12px; background:#fff; word-break:break-word; hyphens:auto;'><a href='{t['enlace']}' style='color:#0B57D0; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#7D7B78;'>• {t['medio']}</small></div>" for t in titulares_info if t.get('idioma','es')=='es'])}
+        {''.join([f"<div style='padding:10px; border:1px solid #ddd; border-radius:12px; background:#fff; word-break:normal; hyphens:auto;'><a href='{t['enlace']}' style='color:#0B57D0; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#7D7B78;'>• {t['medio']}</small></div>" for t in titulares_info if t.get('idioma','es')=='es'])}
       </div>
 
       <!-- Titulares en inglés -->
       <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">🌐 Principales titulares en inglés</h3>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
-        {''.join([f"<div style='padding:10px; border:1px solid #ddd; border-radius:12px; background:#fff; word-break:break-word; hyphens:auto;'><a href='{t['enlace']}' style='color:#0B57D0; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#7D7B78;'>• {t['medio']}</small></div>" for t in titulares_info_en])}
+        {''.join([f"<div style='padding:10px; border:1px solid #ddd; border-radius:12px; background:#fff; word-break:normal; white-space:normal; overflow-wrap:anywhere;'><a href='{t['enlace']}' style='color:#0B57D0; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#7D7B78;'>• {t['medio']}</small></div>" for t in titulares_info_en])}
       </div>
 
       <!-- Nube -->
@@ -712,11 +714,11 @@ def enviar_email():
             msg.attach(imagen)
 
     # 📎 Adjuntar logo del cliente inline
-    if os.path.exists("logo_cliente.png"):  # asegúrate de poner el logo en tu carpeta del proyecto
-        with open("logo_cliente.png", "rb") as logo_file:
+    if os.path.exists("logo.png"):  # asegúrate de poner el logo en tu carpeta del proyecto
+        with open("logo.png", "rb") as logo_file:
             logo = MIMEImage(logo_file.read())
-            logo.add_header("Content-ID", "<logo_cliente>")
-            logo.add_header("Content-Disposition", "inline", filename="logo_cliente.png")
+            logo.add_header("Content-ID", "<logo>")
+            logo.add_header("Content-Disposition", "inline", filename="logo.png")
             msg.attach(logo)        
 
     try:
