@@ -655,30 +655,44 @@ def enviar_email():
     msg["To"] = destinatario
     msg["Subject"] = f"Resumen de noticias {fecha_str}"
 
-    # 📧 Plantilla estilo frontend
+
+    # 📧 Plantilla HTML con estilo
     cuerpo = f"""
-    <div style="font-family:Montserrat,Arial,sans-serif; max-width:800px; margin:auto; background:#f9f9f9; padding:20px; border-radius:12px; border:1px solid #ddd;">
+    <div style="font-family:Montserrat,Arial,sans-serif; max-width:800px; margin:auto; background:#f9f9f9; padding:20px; border-radius:12px; border:1px solid #e5e7eb;">
+      
+      <!-- Header con logos -->
+      <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; margin-bottom:20px; border-bottom:2px solid #e5e7eb;">
+        <img src="cid:logo_cliente" alt="Cliente" style="height:40px;">
+        <div style="font-weight:700; font-size:1.2rem; color:#111;">
+          Monitoreo<span style="color:#FFB429;">+</span>
+        </div>
+      </div>
+
+      <!-- Resumen -->
       <h2 style="font-size:1.4rem; font-weight:700; margin-bottom:14px; color:#111;">
         📅 Resumen diario de noticias — {fecha_str}
       </h2>
-
       <div style="background:#fff; border:1px solid #ddd; border-radius:12px; padding:20px; margin-bottom:20px;">
         <p style="color:#555; line-height:1.7; text-align:justify;">{resumen_texto}</p>
       </div>
 
+      <!-- Indicadores económicos -->
       <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">📊 Indicadores económicos</h3>
       {tabla_html}
 
+      <!-- Titulares en español -->
       <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">🇲🇽 Principales titulares en español</h3>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
-        {''.join([f"<div style='padding:10px 12px; border:1px solid #ddd; border-radius:12px; background:#fff;'><a href='{t['enlace']}' style='color:#007BFF; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#555;'>• {t['medio']}</small></div>" for t in titulares_info if t.get('idioma','es')=='es'])}
+        {''.join([f"<div style='padding:10px; border:1px solid #ddd; border-radius:12px; background:#fff; word-break:break-word; hyphens:auto;'><a href='{t['enlace']}' style='color:#0B57D0; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#7D7B78;'>• {t['medio']}</small></div>" for t in titulares_info if t.get('idioma','es')=='es'])}
       </div>
 
+      <!-- Titulares en inglés -->
       <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">🌐 Principales titulares en inglés</h3>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
-        {''.join([f"<div style='padding:10px 12px; border:1px solid #ddd; border-radius:12px; background:#fff;'><a href='{t['enlace']}' style='color:#007BFF; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#555;'>• {t['medio']}</small></div>" for t in titulares_info_en])}
+        {''.join([f"<div style='padding:10px; border:1px solid #ddd; border-radius:12px; background:#fff; word-break:break-word; hyphens:auto;'><a href='{t['enlace']}' style='color:#0B57D0; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#7D7B78;'>• {t['medio']}</small></div>" for t in titulares_info_en])}
       </div>
 
+      <!-- Nube -->
       <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">☁️ Nube de palabras</h3>
       <div style="text-align:center; margin-top:12px;">
         <img src="cid:nube" alt="Nube de palabras" style="width:100%; max-width:600px; border-radius:12px; border:1px solid #ddd;" />
@@ -696,6 +710,14 @@ def enviar_email():
             imagen.add_header("Content-ID", "<nube>")
             imagen.add_header("Content-Disposition", "inline", filename=archivo_nube)
             msg.attach(imagen)
+
+    # 📎 Adjuntar logo del cliente inline
+    if os.path.exists("logo_cliente.png"):  # asegúrate de poner el logo en tu carpeta del proyecto
+        with open("logo_cliente.png", "rb") as logo_file:
+            logo = MIMEImage(logo_file.read())
+            logo.add_header("Content-ID", "<logo_cliente>")
+            logo.add_header("Content-Disposition", "inline", filename="logo_cliente.png")
+            msg.attach(logo)        
 
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)
