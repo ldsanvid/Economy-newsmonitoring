@@ -626,25 +626,50 @@ def enviar_email():
         economia_dia["Inflación USA"] = inflacion_usa_reciente
     
     if not economia_dia.empty:
+        df_formateada = economia_dia.copy()
+
+        # Columnas en dólares
+        cols_dolar = ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]
+        for col in cols_dolar:
+            if col in df_formateada.columns:
+                df_formateada[col] = df_formateada[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
+
+        # Columnas en porcentaje
+        cols_porcentaje = [
+            "Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
+            "SOFR", "Inflación USA", "Inflación México",
+            "% Dow Jones", "% S&P500", "% Nasdaq"
+        ]
+        for col in cols_porcentaje:
+            if col in df_formateada.columns:
+                df_formateada[col] = df_formateada[col].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
+
         economia_dict = OrderedDict()
-        for col in economia_dia.columns[1:]:
-            economia_dict[col] = economia_dia.iloc[0][col]
+        for col in df_formateada.columns[1:]:
+            economia_dict[col] = df_formateada.iloc[0][col]
 
-        orden_columnas = list(economia_dict.keys())
+        # 🔹 Construcción manual en 3 filas fijas
+        filas = [
+            ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"],
+            ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"],
+            ["SOFR", "% Dow Jones", "% S&P500", "% Nasdaq"]
+        ]
 
-    # Construcción manual de las tarjetas de indicadores
-        tarjetas_html = "<div style='display:flex; flex-wrap:wrap; gap:12px; margin-top:10px;'>"
-        for col in orden_columnas:
-            valor = economia_dict.get(col, "")
-            tarjetas_html += f"""
-            <div style="flex:1 1 calc(33% - 12px); background:#fff; border:1px solid #ddd; border-radius:12px; padding:12px; text-align:center; min-width:150px;">
-                <div style="font-size:0.85rem; color:#7D7B78; margin-bottom:6px;">{col}</div>
-                <div style="font-size:1.1rem; font-weight:700; color:#111;">{valor}</div>
-            </div>
-            """
-        tarjetas_html += "</div>"
+        indicadores_html = ""
+        for fila in filas:
+            indicadores_html += "<div style='display:flex; flex-wrap:wrap; gap:12px; margin-top:10px;'>"
+            for col in fila:
+                valor = economia_dict.get(col, "")
+                indicadores_html += f"""
+                <div style="flex:1 1 calc(25% - 12px); background:#fff; border:1px solid #ddd; border-radius:12px; padding:12px; text-align:center; min-width:150px;">
+                    <div style="font-size:0.85rem; color:#7D7B78; margin-bottom:6px;">{col}</div>
+                    <div style="font-size:1.1rem; font-weight:700; color:#111;">{valor}</div>
+                </div>
+                """
+            indicadores_html += "</div>"
     else:
-        tarjetas_html = "<p>No hay datos económicos</p>"
+        indicadores_html = "<p>No hay datos económicos</p>"
+
 
 
     # ---- CONFIGURACIÓN DEL CORREO ----
@@ -680,7 +705,7 @@ def enviar_email():
 
       <!-- Indicadores económicos -->
       <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">📊 Indicadores económicos</h3>
-      {tarjetas_html}
+      {indicadores_html}
 
       <!-- Titulares en español -->
       <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">🇲🇽 Principales titulares en español</h3>
