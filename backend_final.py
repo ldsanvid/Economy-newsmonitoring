@@ -574,7 +574,7 @@ def pregunta():
 def construir_html_titulares(titulares_info, idioma, usados_medios=None):
     if usados_medios is None:
         usados_medios = set()
-    html = f"<h3>{'🇲🇽 Principales titulares en español' if idioma == 'es' else '🌐 Principales titulares en inglés'}</h3><ul>"
+    html = f"<h3>{' Principales titulares en español' if idioma == 'es' else ' Principales titulares en inglés'}</h3><ul>"
     count = 0
     for titular in titulares_info:
         if not all(k in titular for k in ["titulo", "medio", "enlace", "idioma"]):
@@ -685,48 +685,63 @@ def enviar_email():
 
     # 📧 Plantilla HTML con estilo
     cuerpo = f"""
-    <div style="font-family:Montserrat,Arial,sans-serif; max-width:800px; margin:auto; background:#f9f9f9; padding:20px; border-radius:12px; border:1px solid #e5e7eb;">
-      
-      <!-- Header con logos -->
-      <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; margin-bottom:20px; border-bottom:2px solid #e5e7eb;">
-        <img src="cid:logo" alt="Cliente" style="height:40px;">
-        <div style="font-weight:700; font-size:1.2rem; color:#111;">
-          Monitoreo<span style="color:#FFB429;">+</span>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="width:100%; max-width:800px; font-family:Montserrat,Arial,sans-serif; border-collapse:collapse; margin:auto;">
+    <!-- Header con fondo blanco -->
+    <tr>
+        <td style="background:#fff; padding:16px 20px; border-bottom:2px solid #e5e7eb;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+            <td align="left">
+                <img src="cid:logo" alt="Cliente" style="height:40px;">
+            </td>
+            <td align="right" style="font-weight:700; font-size:1.2rem; color:#111;">
+                Monitoreo<span style="color:#FFB429;">+</span>
+            </td>
+            </tr>
+        </table>
+        </td>
+    </tr>
+
+    <!-- Bloque gris con contenido -->
+    <tr>
+        <td style="background:#f9f9f9; padding:20px; border:1px solid #e5e7eb; border-radius:0 0 12px 12px;">
+        
+        <!-- Resumen -->
+        <h2 style="font-size:1.4rem; font-weight:700; margin-bottom:14px; color:#111;">
+            📅 Resumen diario de noticias — {fecha_str}
+        </h2>
+        <div style="background:#fff; border:1px solid #ddd; border-radius:12px; padding:20px; margin-bottom:20px;">
+            <p style="color:#555; line-height:1.7; text-align:justify;">{resumen_texto}</p>
         </div>
-      </div>
 
-      <!-- Resumen -->
-      <h2 style="font-size:1.4rem; font-weight:700; margin-bottom:14px; color:#111;">
-        📅 Resumen diario de noticias — {fecha_str}
-      </h2>
-      <div style="background:#fff; border:1px solid #ddd; border-radius:12px; padding:20px; margin-bottom:20px;">
-        <p style="color:#555; line-height:1.7; text-align:justify;">{resumen_texto}</p>
-      </div>
+        <!-- Indicadores -->
+        <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">📊 Indicadores económicos</h3>
+        {indicadores_html}
 
-      <!-- Indicadores económicos -->
-      <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">📊 Indicadores económicos</h3>
-      {indicadores_html}
+        <!-- Titulares español -->
+        <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">🗞️ Principales titulares en español</h3>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
+            {''.join([f"<div style='padding:10px; border:1px solid #ddd; border-radius:12px; background:#fff; max-width:100%; word-break:normal; white-space:normal; overflow-wrap:anywhere;'><a href='{t['enlace']}' style='color:#0B57D0; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#7D7B78;'>• {t['medio']}</small></div>" for t in titulares_info if t.get('idioma','es')=='es'])}
+        </div>
 
-      <!-- Titulares en español -->
-      <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">🇲🇽 Principales titulares en español</h3>
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
-        {''.join([f"<div style='padding:10px; border:1px solid #ddd; border-radius:12px; background:#fff; word-break:normal; hyphens:auto;'><a href='{t['enlace']}' style='color:#0B57D0; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#7D7B78;'>• {t['medio']}</small></div>" for t in titulares_info if t.get('idioma','es')=='es'])}
-      </div>
+        <!-- Titulares inglés -->
+        <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">🗞️ Principales titulares en inglés</h3>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
+            {''.join([f"<div style='padding:10px; border:1px solid #ddd; border-radius:12px; background:#fff; max-width:100%; word-break:normal; white-space:normal; overflow-wrap:anywhere;'><a href='{t['enlace']}' style='color:#0B57D0; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#7D7B78;'>• {t['medio']}</small></div>" for t in titulares_info_en])}
+        </div>
 
-      <!-- Titulares en inglés -->
-      <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">🌐 Principales titulares en inglés</h3>
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
-        {''.join([f"<div style='padding:10px; border:1px solid #ddd; border-radius:12px; background:#fff; word-break:normal; white-space:normal; overflow-wrap:anywhere;'><a href='{t['enlace']}' style='color:#0B57D0; font-weight:600; text-decoration:none;'>{t['titulo']}</a><br><small style='color:#7D7B78;'>• {t['medio']}</small></div>" for t in titulares_info_en])}
-      </div>
+        <!-- Nube -->
+        <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">☁️ Nube de palabras</h3>
+        <div style="text-align:center; margin-top:12px;">
+            <img src="cid:nube" alt="Nube de palabras" style="width:100%; max-width:600px; border-radius:12px; border:1px solid #ddd;" />
+            <p style="color:#555; font-size:.9rem;">Adjunto encontrarás la nube de palabras en formato de imagen.</p>
+        </div>
 
-      <!-- Nube -->
-      <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">☁️ Nube de palabras</h3>
-      <div style="text-align:center; margin-top:12px;">
-        <img src="cid:nube" alt="Nube de palabras" style="width:100%; max-width:600px; border-radius:12px; border:1px solid #ddd;" />
-        <p style="color:#555; font-size:.9rem;">Adjunto encontrarás la nube de palabras en formato de imagen.</p>
-      </div>
-    </div>
+        </td>
+    </tr>
+    </table>
     """
+
 
     msg.attach(MIMEText(cuerpo, "html"))
 
