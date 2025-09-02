@@ -223,7 +223,8 @@ def generar_nube(titulos, archivo_salida):
         "se", "su", "sus", "lo", "al", "el", "en", "y", "a", "de", "un", "es", "si", "quieren", "aún",
         "mantiene", "buscaría", "la", "haciendo", "recurriría", "ante", "meses", "están", "subir",
         "ayer", "prácticamente", "sustancialmente", "busca", "cómo", "qué", "días", "construcción","tariffs",
-        "aranceles","construcción","merger","and","stock","to","on","supply","chain"    
+        "aranceles","construcción","merger","and","stock","to","on","supply","chain","internacional",
+        "global","China","Estados Unidos"    
     ])
     wc = WordCloud(
         width=800,
