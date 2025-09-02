@@ -685,6 +685,7 @@ def enviar_email():
 
     # 📧 Plantilla HTML con estilo
     cuerpo = f"""
+    
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="width:100%; max-width:800px; font-family:Montserrat,Arial,sans-serif; border-collapse:collapse; margin:auto;">
     <!-- Header con fondo blanco -->
     <tr>
@@ -734,7 +735,6 @@ def enviar_email():
         <h3 style="font-size:1.15rem; font-weight:700; color:#555; margin-top:20px;">☁️ Nube de palabras</h3>
         <div style="text-align:center; margin-top:12px;">
             <img src="cid:nube" alt="Nube de palabras" style="width:100%; max-width:600px; border-radius:12px; border:1px solid #ddd;" />
-            <p style="color:#555; font-size:.9rem;">Adjunto encontrarás la nube de palabras en formato de imagen.</p>
         </div>
 
         </td>
