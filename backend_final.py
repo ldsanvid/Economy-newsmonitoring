@@ -83,7 +83,7 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - Mark Carney es el actual primer ministro de Canadá.
 - Keir Starmer es el actual primer ministro del Reino Unido.
 - Scott Bessent es el actual Secretario del Tesoro de Estados Unidos.
-- Javier Millei es el actual Presidente de Argentina.
+- Javier Milei es el actual Presidente de Argentina.
 - Yolanda Díaz es la actual Vicepresidenta del Gobierno de España.
 - Pedro Sánchez es el actual Presidente del Gobierno de España.
 - Giorgia Meloni es la actual primera ministra de Italia.
@@ -95,7 +95,9 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - Luis Rosendo Gutiérrez es el actual Subsecretario de Comercio Exterior de México.
 - Carlos García es el actual Presidente de la American Chamber of Commerce (AmCham).
 - Ildefonso Guajardo fue Secretario de Economía de México entre 2012 y 2018.
-- Luiz Inacio Lula Da Silva es el actual Presidente de Brasil. Jair Bolsonaro es elexpresidente de Brasil. 
+- Luiz Inacio Lula Da Silva es el actual Presidente de Brasil. Jair Bolsonaro es elexpresidente de Brasil.
+- Christine Lagarde es la actual Presidenta del Banco Central Europeo.
+- GOP es el Partido Republicano estadounidense. 
 """
 # 1️⃣ Extraer fecha desde texto
 def extraer_fecha(pregunta):
@@ -137,9 +139,11 @@ def extraer_entidades(texto):
         "Starmer": ["primer ministro del reino unido"],
         "Bessent": ["secretario del tesoro"],
         "Powell": ["reserva federal"],
-        "Millei": ["presidente de argentina"],
+        "Milei": ["presidente de argentina"],
         "Von Der Leyen": ["presidenta de la comisión europea"],
-        "Petro": ["presidente de colombia"]
+        "Petro": ["presidente de colombia"],
+        "Fed": ["Federal Reserve"]
+
     }
     lugares_dict = {
         "Nuevo León": ["nl", "monterrey"],
