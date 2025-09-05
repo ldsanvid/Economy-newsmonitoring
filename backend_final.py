@@ -65,6 +65,18 @@ df_economia = df_economia.merge(df_infl_us[["Fecha", "Inflación EE.UU."]], on="
 df_economia = df_economia.merge(df_infl_mx[["Fecha", "Inflación México"]], on="Fecha", how="left")
 df_economia = df_economia.merge(df_wall[["Fecha", "% Dow Jones", "% S&P500", "% Nasdaq"]], on="Fecha", how="left")
 
+categorias_dict = {
+        "Aranceles": ["arancel","tarifas", "restricciones comerciales","tariff"],
+        "Parque Industrial": ["zona industrial","parque industrial"],
+        "Fibra": ["fideicomiso inmobiliario", "fibras","fibra","reit"],
+        "Fusiones": ["adquisiciones", "compras empresariales"],
+        "Naves Industriales": ["inmuebles industriales","nave industrial","bodegas industriales","naves industriales","parque industrial"],
+        "Real Estate": ["mercado inmobiliario"],
+        "Construcción Industrial": ["obra industrial"],
+        "Sector Industrial": ["industria pesada", "manufactura"],
+        "Industria Automotriz": ["automotriz", "coches", "car industry"],
+        "Transporte":["industria de transporte", "transporte de carga"]
+    }
 # ------------------------------
 # 📜 Contexto político único
 # ------------------------------
@@ -152,18 +164,7 @@ def extraer_entidades(texto):
         "Reino Unido": ["gran bretaña", "inglaterra"],
         "Estados Unidos": ["eeuu", "eua", "usa", "eu"]
     }
-    categorias_dict = {
-        "Aranceles": ["arancel","tarifas", "restricciones comerciales","tariff"],
-        "Parque Industrial": ["zona industrial","parque industrial"],
-        "Fibra": ["fideicomiso inmobiliario", "fibras","fibra","reit"],
-        "Fusiones": ["adquisiciones", "compras empresariales"],
-        "Naves Industriales": ["inmuebles industriales","nave industrial","bodegas industriales","naves industriales","parque industrial"],
-        "Real Estate": ["mercado inmobiliario"],
-        "Construcción Industrial": ["obra industrial"],
-        "Sector Industrial": ["industria pesada", "manufactura"],
-        "Industria Automotriz": ["automotriz", "coches", "car industry"],
-        "Transporte":["industria de transporte", "transporte de carga"]
-    }
+    
     encontrados = {"personajes": [], "lugares": [], "categorias": []}
 
     for nombre, sinonimos in personajes_dict.items():
@@ -193,7 +194,14 @@ def filtrar_titulares(fecha, entidades, sentimiento_deseado):
     if entidades["lugares"]:
         filtro = filtro[filtro["Cobertura"].str.lower().apply(lambda c: any(l.lower() in c for l in entidades["lugares"]))]
     if entidades["categorias"]:
-        filtro = filtro[filtro["Término"].str.lower().apply(lambda cat: any(e.lower() in cat for e in entidades["categorias"]))]
+        sinonimos = []
+        for cat in entidades["categorias"]:
+            sinonimos.extend(categorias_dict.get(cat, []))  # todos los sinónimos del diccionario
+            sinonimos.append(cat.lower())  # t  ambién el nombre de la categoría
+        filtro = filtro[filtro["Término"].str.lower().apply(
+            lambda cat: any(s in cat for s in sinonimos)
+        )]
+
     if sentimiento_deseado:
         filtro = filtro[filtro["Sentimiento"] == sentimiento_deseado]
 
@@ -231,7 +239,8 @@ def generar_nube(titulos, archivo_salida):
         "mantiene", "buscaría", "la", "haciendo", "recurriría", "ante", "meses", "están", "subir",
         "ayer", "prácticamente", "sustancialmente", "busca", "cómo", "qué", "días", "construcción","tariffs",
         "aranceles","construcción","merger","and","stock","to","on","supply","chain","internacional",
-        "global","China","Estados Unidos", "with","for","say","that","are","as","of","Tariff"    
+        "global","China","Estados Unidos", "with","for","say","that","are","as","of","Tariff","from",
+        "it","says"    
     ])
     wc = WordCloud(
         width=800,
@@ -403,7 +412,7 @@ Noticias no relacionadas con aranceles:
         def format_porcentaje_directo(x):
             try:
                 x_clean = str(x).replace('%','').strip()
-                return f"{float(x_clean):.2f}%"
+                return f"{float(x_clean):*100.3f}%"
             except:
                 return ""
         # Formato para nuevos indicadores
