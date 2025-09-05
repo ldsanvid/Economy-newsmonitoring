@@ -245,7 +245,7 @@ def generar_nube(titulos, archivo_salida):
         "ayer", "prácticamente", "sustancialmente", "busca", "cómo", "qué", "días", "construcción","tariffs",
         "aranceles","construcción","merger","and","stock","to","on","supply","chain","internacional",
         "global","Estados Unidos", "with","for","say","that","are","as","of","Tariff","from",
-        "it","says","the","its","after"    
+        "it","says","the","its","after","by","in","but"    
     ])
     wc = WordCloud(
         width=800,
@@ -422,9 +422,6 @@ Noticias no relacionadas con aranceles:
                 return ""
         # Formato para nuevos indicadores
         economia_dia["SOFR"] = economia_dia["SOFR"].apply(format_porcentaje_directo)
-        economia_dia["Inflación EE.UU."] = economia_dia["Inflación EE.UU."].apply(format_porcentaje_directo)
-        economia_dia["Inflación México"] = economia_dia["Inflación México"].apply(format_porcentaje_directo)
-
 
         def format_signed_pct(x):
             try:
