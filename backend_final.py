@@ -110,7 +110,8 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - Ildefonso Guajardo fue Secretario de Economía de México entre 2012 y 2018.
 - Luiz Inacio Lula Da Silva es el actual Presidente de Brasil. Jair Bolsonaro es elexpresidente de Brasil.
 - Christine Lagarde es la actual Presidenta del Banco Central Europeo.
-- GOP es el Partido Republicano estadounidense. 
+- GOP es el Partido Republicano estadounidense.
+- Verónica Delgadillo es la actual Alcaldesa de Guadalajara 
 """
 # 1️⃣ Extraer fecha desde texto
 def extraer_fecha(pregunta):
@@ -243,8 +244,8 @@ def generar_nube(titulos, archivo_salida):
         "mantiene", "buscaría", "la", "haciendo", "recurriría", "ante", "meses", "están", "subir",
         "ayer", "prácticamente", "sustancialmente", "busca", "cómo", "qué", "días", "construcción","tariffs",
         "aranceles","construcción","merger","and","stock","to","on","supply","chain","internacional",
-        "global","China","Estados Unidos", "with","for","say","that","are","as","of","Tariff","from",
-        "it","says"    
+        "global","Estados Unidos", "with","for","say","that","are","as","of","Tariff","from",
+        "it","says","the","its","after"    
     ])
     wc = WordCloud(
         width=800,
@@ -393,7 +394,7 @@ Noticias no relacionadas con aranceles:
         for col in ["Inflación México", "Inflación EE.UU."]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
-                economia_dia[col] = economia_dia[col].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "")
+                economia_dia[col] = economia_dia[col].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
 
 
         # Reordenar columnas según el orden deseado
