@@ -153,14 +153,16 @@ def extraer_entidades(texto):
         "Estados Unidos": ["eeuu", "eua", "usa", "eu"]
     }
     categorias_dict = {
-        "Aranceles": ["arancel","tarifas", "restricciones comerciales"],
+        "Aranceles": ["arancel","tarifas", "restricciones comerciales","tariff"],
         "Parque Industrial": ["zona industrial","parque industrial"],
-        "Fibra": ["fideicomiso inmobiliario", "fibras"],
+        "Fibra": ["fideicomiso inmobiliario", "fibras","fibra","reit"],
         "Fusiones": ["adquisiciones", "compras empresariales"],
-        "Naves Industriales": ["inmuebles industriales","nave industrial","bodegas industriales"],
+        "Naves Industriales": ["inmuebles industriales","nave industrial","bodegas industriales","naves industriales","parque industrial"],
         "Real Estate": ["mercado inmobiliario"],
         "Construcción Industrial": ["obra industrial"],
-        "Sector Industrial": ["industria pesada", "manufactura"]
+        "Sector Industrial": ["industria pesada", "manufactura"],
+        "Industria Automotriz": ["automotriz", "coches", "car industry"],
+        "Transporte":["industria de transporte", "transporte de carga"]
     }
     encontrados = {"personajes": [], "lugares": [], "categorias": []}
 
