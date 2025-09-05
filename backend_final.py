@@ -178,6 +178,10 @@ def extraer_entidades(texto):
     for cat, sinonimos in categorias_dict.items():
         if any(s in texto_lower for s in [cat.lower()] + sinonimos):
             encontrados["categorias"].append(cat)
+            # 👇 opcional: añade también los sinónimos encontrados
+            for s in sinonimos:
+                if s in texto_lower:
+                    encontrados["categorias"].append(s)
 
     return encontrados
 
@@ -412,7 +416,7 @@ Noticias no relacionadas con aranceles:
         def format_porcentaje_directo(x):
             try:
                 x_clean = str(x).replace('%','').strip()
-                return f"{float(x_clean):*100.3f}%"
+                return f"{float(x_clean)*100:.2f}%"
             except:
                 return ""
         # Formato para nuevos indicadores
