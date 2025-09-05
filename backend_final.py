@@ -229,7 +229,7 @@ def generar_nube(titulos, archivo_salida):
         "mantiene", "buscaría", "la", "haciendo", "recurriría", "ante", "meses", "están", "subir",
         "ayer", "prácticamente", "sustancialmente", "busca", "cómo", "qué", "días", "construcción","tariffs",
         "aranceles","construcción","merger","and","stock","to","on","supply","chain","internacional",
-        "global","China","Estados Unidos"    
+        "global","China","Estados Unidos", "with","for","say","that","are","as","of","Tariff"    
     ])
     wc = WordCloud(
         width=800,
@@ -305,7 +305,7 @@ Segundo párrafo: Si el tema más repetido del día es de noticias nacionales, u
 
 Tercer párrafo: Resume brevemente las noticias que son de cobertura de algún estado de México (locales), excluyendo aquellas de cobertura nacional o internacional. Menciona el estado o ciudad de cobertura de cada noticia. No repitas noticias mencionadas en los párrafos anteriores ni inventes cosas. Reserva todo lo relativo a fibras, naves industriales, parques industriales, hub logístico, hub industrial, real estate industrial, sector industrial o sector mobiliario industrial.
 
-Cuarto párrafo: Por último, resume de forma general las noticias que no están relacionadas con aranceles y que tienen que ver con fibras, naves industriales, parques industriales, hub logístico, hub industrial, real estate industrial, sector industrial o sector mobiliario industrial. Evita repetir noticias mencionadas en los otros párrafos ni inventes cosas. Recuerda, temas no arancelarios. Empieza diciendo "finalmente en otros temas económicos", sin recalcar de que se trata de noticias del ámbito local o nacional..
+Cuarto párrafo: Por último, resume de forma general las noticias que no están relacionadas con aranceles y que tienen que ver con fibras, naves industriales, parques industriales, hub logístico, hub industrial, real estate industrial, sector industrial o sector mobiliario industrial SIN REPETIR ALGUNA NOTICIAS MENCIONADA EN PÁRRAFOS PREVIOS. Evita repetir noticias mencionadas en los otros párrafos ni inventes cosas. Recuerda, temas no arancelarios. Empieza diciendo "finalmente en otros temas económicos", sin recalcar de que se trata de noticias del ámbito local o nacional..
 
 Noticias nacionales:
 {contexto_nacional}
@@ -401,7 +401,7 @@ Noticias no relacionadas con aranceles:
         def format_porcentaje_directo(x):
             try:
                 x_clean = str(x).replace('%','').strip()
-                return f"{float(x_clean)*100:.2f}%"
+                return f"{float(x_clean):.2f}%"
             except:
                 return ""
         # Formato para nuevos indicadores
