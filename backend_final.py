@@ -51,6 +51,7 @@ df_economia = pd.merge(df_tipo_cambio, df_tasas, on=["Año", "Fecha"], how="oute
 df_sofr = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Treasuries_SOFR")
 df_wall = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Wallstreet")
 df_infl_us = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónUS")
+df_infl_us = df_infl_us.rename(columns={"Inflación USA": "Inflación EE.UU."})
 df_infl_mx = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónMEX")
 
 # Unificar fechas
