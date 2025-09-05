@@ -60,7 +60,7 @@ for df_tmp in [df_sofr, df_wall, df_infl_us, df_infl_mx]:
 # Unir con df_economia
 df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
 df_economia = df_economia.merge(df_sofr[["Fecha", "SOFR"]], on="Fecha", how="left")
-df_economia = df_economia.merge(df_infl_us[["Fecha", "Inflación USA"]], on="Fecha", how="left")
+df_economia = df_economia.merge(df_infl_us[["Fecha", "Inflación EE.UU."]], on="Fecha", how="left")
 df_economia = df_economia.merge(df_infl_mx[["Fecha", "Inflación México"]], on="Fecha", how="left")
 df_economia = df_economia.merge(df_wall[["Fecha", "% Dow Jones", "% S&P500", "% Nasdaq"]], on="Fecha", how="left")
 
@@ -391,8 +391,6 @@ Noticias no relacionadas con aranceles:
             "TIIE 91 días",
             "TIIE 182 días",
             "SOFR",
-            "Inflación USA",
-            "Inflación México",
             "% Dow Jones",
             "% S&P500",
             "% Nasdaq",
@@ -667,7 +665,8 @@ def enviar_email():
         filas = [
             ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"],
             ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"],
-            ["SOFR", "% Dow Jones", "% S&P500", "% Nasdaq"]
+            ["SOFR", "% Dow Jones", "% S&P500", "% Nasdaq"],
+            ["Inflación México", "Inflación EE.UU."]
         ]
 
         indicadores_html = ""
