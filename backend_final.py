@@ -348,9 +348,9 @@ Noticias no relacionadas con aranceles:
     # Filtrar datos económicos
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt]
     # Si la inflación USA está vacía en el día seleccionado, usar el valor más reciente disponible
-    if economia_dia["Inflación USA"].isnull().all() or economia_dia["Inflación USA"].iloc[0] in ["", None]:
-        inflacion_usa_reciente = df_economia["Inflación USA"].dropna().replace("", np.nan).dropna().iloc[-1]
-        economia_dia["Inflación USA"] = inflacion_usa_reciente
+    if economia_dia["Inflación EE.UU."].isnull().all() or economia_dia["Inflación EE.UU."].iloc[0] in ["", None]:
+        inflacion_usa_reciente = df_economia["Inflación EE.UU."].dropna().replace("", np.nan).dropna().iloc[-1]
+        economia_dia["Inflación EE.UU."] = inflacion_usa_reciente
 
 
     # Si no hay datos exactos, usar el más reciente antes de esa fecha
@@ -406,7 +406,7 @@ Noticias no relacionadas con aranceles:
                 return ""
         # Formato para nuevos indicadores
         economia_dia["SOFR"] = economia_dia["SOFR"].apply(format_porcentaje_directo)
-        economia_dia["Inflación USA"] = economia_dia["Inflación USA"].apply(format_porcentaje_directo)
+        economia_dia["Inflación EE.UU."] = economia_dia["Inflación EE.UU."].apply(format_porcentaje_directo)
         economia_dia["Inflación México"] = economia_dia["Inflación México"].apply(format_porcentaje_directo)
 
 
@@ -635,9 +635,9 @@ def enviar_email():
     # 📊 Indicadores económicos
     fecha_dt = pd.to_datetime(fecha_str).date()
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt].copy()
-    if "Inflación USA" in economia_dia.columns and economia_dia["Inflación USA"].isnull().all():
-        inflacion_usa_reciente = df_economia["Inflación USA"].dropna().iloc[-1]
-        economia_dia["Inflación USA"] = inflacion_usa_reciente
+    if "Inflación EE.UU." in economia_dia.columns and economia_dia["Inflación EE.UU."].isnull().all():
+        inflacion_usa_reciente = df_economia["Inflación EE.UU."].dropna().iloc[-1]
+        economia_dia["Inflación EE.UU."] = inflacion_usa_reciente
     
     if not economia_dia.empty:
         df_formateada = economia_dia.copy()
@@ -651,7 +651,7 @@ def enviar_email():
         # Columnas en porcentaje
         cols_porcentaje = [
             "Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
-            "SOFR", "Inflación USA", "Inflación México",
+            "SOFR", "Inflación EE.UU.", "Inflación México",
             "% Dow Jones", "% S&P500", "% Nasdaq"
         ]
         for col in cols_porcentaje:
