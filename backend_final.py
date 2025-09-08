@@ -820,7 +820,7 @@ def get_fechas():
 # ------------------------------
 # 📑 Endpoint para análisis semanal
 # ------------------------------
-@app.route("/analisis_semanal", methods=["GET"])
+@app.route("/análisis_semanal", methods=["GET"])
 def analisis_semanal():
     carpeta = "análisis_semanal"
     os.makedirs(carpeta, exist_ok=True)
@@ -844,14 +844,14 @@ def analisis_semanal():
 
         resultados.append({
             "nombre": nombre_bonito,
-            "url": f"/analisis/{f}"
+            "url": f"/análisis/{f}"
         })
 
     return jsonify(resultados)
 
 @app.route("/analisis/<path:filename>", methods=["GET"])
 def descargar_analisis(filename):
-    return send_from_directory("analisis_semanal", filename, as_attachment=False)
+    return send_from_directory("análisis_semanal", filename, as_attachment=False)
 
 
 if __name__ == "__main__":
