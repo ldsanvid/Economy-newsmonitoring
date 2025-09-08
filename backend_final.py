@@ -73,7 +73,7 @@ df_economia = df_economia.merge(df_infl_mx[["Fecha", "Inflación México"]], on=
 df_economia = df_economia.merge(df_wall[["Fecha", "% Dow Jones", "% S&P500", "% Nasdaq"]], on="Fecha", how="left")
 
 categorias_dict = {
-        "Aranceles": ["arancel","tarifas", "restricciones comerciales","tariff"],
+        "Aranceles": ["arancel","tarifas", "restricciones comerciales","tariff","aranceles"],
         "Parque Industrial": ["zona industrial","parque industrial"],
         "Fibra": ["fideicomiso inmobiliario", "fibras","fibra","reit"],
         "Fusiones": ["adquisiciones", "compras empresariales"],
@@ -184,12 +184,9 @@ def extraer_entidades(texto):
             encontrados["lugares"].append(lugar)
 
     for cat, sinonimos in categorias_dict.items():
-        if any(s in texto_lower for s in [cat.lower()] + sinonimos):
+        # Busca tanto la clave como los sinónimos
+        if cat.lower() in texto_lower or any(s in texto_lower for s in sinonimos):
             encontrados["categorias"].append(cat)
-            # 👇 opcional: añade también los sinónimos encontrados
-            for s in sinonimos:
-                if s in texto_lower:
-                    encontrados["categorias"].append(s)
 
     return encontrados
 
