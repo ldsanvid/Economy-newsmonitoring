@@ -22,13 +22,11 @@ from email import encoders
 import base64
 import requests
 import calendar
-import locale
+from babel.dates import format_date
 
-# Configurar locale a español para formatear meses
-try:
-    locale.setlocale(locale.LC_TIME, "es_ES.utf8")
-except:
-    locale.setlocale(locale.LC_TIME, "es_MX.utf8")
+def nombre_mes(fecha):
+    """Devuelve la fecha con mes en español, ej: 'agosto 2025'"""
+    return format_date(fecha, "LLLL yyyy", locale="es").capitalize()
 
 
 # ------------------------------
@@ -840,7 +838,7 @@ def analisis_semanal():
         if match:
             fecha_inicio = datetime.strptime(match.group(1), "%Y-%m-%d")
             fecha_fin = datetime.strptime(match.group(2), "%Y-%m-%d")
-            nombre_bonito = f"Análisis semanal: {fecha_inicio.day}–{fecha_fin.day} {fecha_fin.strftime('%B %Y')}"
+            nombre_bonito = f"Análisis semanal: {fecha_inicio.day}–{fecha_fin.day} {nombre_mes(fecha_fin)}"
         else:
             nombre_bonito = f  # fallback al nombre del archivo
 
