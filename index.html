@@ -136,9 +136,9 @@
       <div id="respuestaTexto" class="summary"></div>
       <div id="titularesPregunta" class="chips"></div>
     </section>
-    <section id="analisis" class="card row" style="margin-top:18px">
-  <h2>📑 Análisis semanal</h2>
-  <div id="listaAnalisis" class="chips"></div>
+    <section id="reporte" class="card row" style="margin-top:18px">
+  <h2>📑 Reporte semanal</h2>
+  <div id="listaReportes" class="chips"></div>
     </section>
         <!-- Sección de dashboards -->
         <!-- Sección de dashboards -->
@@ -327,16 +327,16 @@
 cargarFechas();
 
     cargarFechas();
-const listaAnalisisDiv = document.getElementById('listaAnalisis');
+const listaReportesDiv = document.getElementById('listaReportes');
 
-async function cargarAnalisis() {
-  const r = await fetch(`${API_BASE}/analisis_semanal`);
+async function cargarReportes() {
+  const r = await fetch(`${API_BASE}/reporte_semanal`);
   const data = await r.json();
   if (!data || data.length === 0) {
-    listaAnalisisDiv.innerHTML = '<em>No hay análisis disponibles</em>';
+    listaReportesDiv.innerHTML = '<em>No hay reportes disponibles</em>';
     return;
   }
-  listaAnalisisDiv.innerHTML = data.map(a =>
+  listaReportesDiv.innerHTML = data.map(a =>
     `<div class="chip">
        📄 <a href="${API_BASE}${a.url}" target="_blank">${a.nombre}</a>
        <a href="${API_BASE}${a.url}" download style="margin-left:10px; font-size:.9rem; color:#12b886; text-decoration:none;">📥 Descargar</a>
@@ -344,7 +344,7 @@ async function cargarAnalisis() {
   ).join('');
 }
 
-cargarAnalisis();
+cargarReportes();
 
   </script>
 </body>
