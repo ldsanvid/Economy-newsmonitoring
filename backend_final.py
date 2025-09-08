@@ -193,23 +193,28 @@ def extraer_entidades(texto):
 
     return encontrados
 
-# 5️⃣ Filtrar titulares por fecha, entidades y sentimiento
-def filtrar_titulares(fecha, entidades, sentimiento_deseado):
-    noticias_fecha = df[df["Fecha"].dt.date == fecha]
-    if noticias_fecha.empty:
-        return pd.DataFrame()  # 🔹 Devuelve DataFrame vacío si no hay noticias
+# 5️⃣ Filtrar titulares por entidades y sentimiento
+def filtrar_titulares(df_filtrado, entidades, sentimiento_deseado):
+    if df_filtrado.empty:
+        return pd.DataFrame()
 
-    filtro = noticias_fecha.copy()
+    filtro = df_filtrado.copy()
 
     if entidades["personajes"]:
-        filtro = filtro[filtro["Título"].str.lower().apply(lambda t: any(p.lower() in t for p in entidades["personajes"]))]
+        filtro = filtro[filtro["Título"].str.lower().apply(
+            lambda t: any(p.lower() in t for p in entidades["personajes"])
+        )]
+
     if entidades["lugares"]:
-        filtro = filtro[filtro["Cobertura"].str.lower().apply(lambda c: any(l.lower() in c for l in entidades["lugares"]))]
+        filtro = filtro[filtro["Cobertura"].str.lower().apply(
+            lambda c: any(l.lower() in c for l in entidades["lugares"])
+        )]
+
     if entidades["categorias"]:
         sinonimos = []
         for cat in entidades["categorias"]:
-            sinonimos.extend(categorias_dict.get(cat, []))  # todos los sinónimos del diccionario
-            sinonimos.append(cat.lower())  # t  ambién el nombre de la categoría
+            sinonimos.extend(categorias_dict.get(cat, []))  # todos los sinónimos
+            sinonimos.append(cat.lower())  # también el nombre de la categoría
         filtro = filtro[filtro["Término"].str.lower().apply(
             lambda cat: any(s in cat for s in sinonimos)
         )]
@@ -217,7 +222,8 @@ def filtrar_titulares(fecha, entidades, sentimiento_deseado):
     if sentimiento_deseado:
         filtro = filtro[filtro["Sentimiento"] == sentimiento_deseado]
 
-    return filtro  # 🔹 Devuelve DataFrame, no lista
+    return filtro
+
 
 # 6️⃣ Seleccionar titulares más relevantes (TF-IDF + coseno)
 def seleccionar_titulares_relevantes(titulares, pregunta):
@@ -517,6 +523,17 @@ def resumen():
 
     return jsonify(resultado)
 
+def extraer_rango_fechas(pregunta):
+    # Busca expresiones tipo "entre el 25 y el 29 de agosto"
+    match = re.search(r"entre el (\d{1,2}) y el (\d{1,2}) de ([a-zA-Z]+)(?: de (\d{4}))?", pregunta.lower())
+    if match:
+        dia_inicio, dia_fin, mes, anio = match.groups()
+        anio = anio if anio else str(datetime.now().year)
+        fecha_inicio = dateparser.parse(f"{dia_inicio} de {mes} de {anio}", languages=['es'])
+        fecha_fin = dateparser.parse(f"{dia_fin} de {mes} de {anio}", languages=['es'])
+        if fecha_inicio and fecha_fin:
+            return fecha_inicio.date(), fecha_fin.date()
+    return None, None
 
 #pregunta!!!!    
 @app.route("/pregunta", methods=["POST"])
@@ -529,22 +546,32 @@ def pregunta():
     # 1️⃣ Detectar sentimiento deseado
     sentimiento_deseado = detectar_sentimiento_deseado(q)
 
-    # 2️⃣ Extraer fecha de la pregunta
-    fecha_detectada = extraer_fecha(q)
-    if fecha_detectada:
-        fecha_dt = fecha_detectada  # ya es un objeto date
+    # 2️⃣ Detectar rango de fechas o fecha única
+    fecha_inicio, fecha_fin = extraer_rango_fechas(q)
+    if fecha_inicio and fecha_fin:
+        df_filtrado = df[(df["Fecha"].dt.date >= fecha_inicio) & (df["Fecha"].dt.date <= fecha_fin)]
     else:
-        fecha_dt = obtener_fecha_mas_reciente(df)  # usamos la más reciente
+        fecha_detectada = extraer_fecha(q)
+        if fecha_detectada:
+            fecha_dt = fecha_detectada
+        else:
+            fecha_dt = obtener_fecha_mas_reciente(df)
+        df_filtrado = df[df["Fecha"].dt.date == fecha_dt]
 
     # 3️⃣ Extraer entidades
     entidades = extraer_entidades(q)
 
-    # 4️⃣ Filtrar titulares
-    df_filtrado = filtrar_titulares(fecha_dt, entidades, sentimiento_deseado)
+    # 4️⃣ Aplicar filtros de entidades y sentimiento
+    # 4️⃣ Aplicar filtros de entidades y sentimiento sobre todo el rango o fecha
+    df_filtrado = filtrar_titulares(df_filtrado, entidades, sentimiento_deseado)
+
 
     # 5️⃣ Si no hay resultados
     if df_filtrado.empty:
-        return jsonify({"respuesta": f"No encontré noticias relacionadas con tu pregunta para {fecha_dt}."})
+        if fecha_inicio and fecha_fin:
+            return jsonify({"respuesta": f"No encontré noticias relacionadas con tu pregunta entre {fecha_inicio} y {fecha_fin}."})
+        else:
+            return jsonify({"respuesta": f"No encontré noticias relacionadas con tu pregunta para {fecha_dt}."})
 
     # 6️⃣ Vectorizar titulares y pregunta
     tfidf = TfidfVectorizer()
@@ -576,7 +603,6 @@ def pregunta():
     respuesta_gpt = respuesta.choices[0].message.content
 
     # 🔟 Devolver respuesta y titulares
-    # 🔟 Devolver respuesta y titulares usados (entre 1 y 5)
     titulares_info = [
         {
             "titulo": row["Título"],
@@ -584,48 +610,12 @@ def pregunta():
             "enlace": row["Enlace"]
         }
         for _, row in titulares_relevantes.iterrows()
-    ]
-
-    # Garantizar que haya mínimo 1 y máximo 5 titulares
-    if len(titulares_info) == 0:
-        # Si por alguna razón no hubiera titulares relevantes
-        titulares_info = [
-            {
-                "titulo": row["Título"],
-                "medio": row["Fuente"],
-                "enlace": row["Enlace"]
-            }
-            for _, row in df_filtrado.head(1).iterrows()
-        ]
-    else:
-        titulares_info = titulares_info[:5]
+    ][:5]  # máximo 5
 
     return jsonify({
         "respuesta": respuesta_gpt,
         "titulares_usados": titulares_info
     })
-
-def construir_html_titulares(titulares_info, idioma, usados_medios=None):
-    if usados_medios is None:
-        usados_medios = set()
-    html = f"<h3>{' Principales titulares en español' if idioma == 'es' else ' Principales titulares en inglés'}</h3><ul>"
-    count = 0
-    for titular in titulares_info:
-        if not all(k in titular for k in ["titulo", "medio", "enlace", "idioma"]):
-            continue
-        if idioma == "es" and titular["idioma"] != "es":
-            continue
-        if idioma == "en" and titular["idioma"] != "en":
-            continue
-        if titular["medio"] in usados_medios:
-            continue
-        html += f"<li><a href='{titular['enlace']}'>{titular['titulo']}</a> — <em>{titular['medio']}</em></li>"
-        usados_medios.add(titular["medio"])
-        count += 1
-        if count >= 8:
-            break
-    html += "</ul>"
-    return html
 
 #correoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 @app.route("/enviar_email", methods=["POST"])
