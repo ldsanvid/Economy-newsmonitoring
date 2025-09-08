@@ -136,6 +136,10 @@
       <div id="respuestaTexto" class="summary"></div>
       <div id="titularesPregunta" class="chips"></div>
     </section>
+    <section id="analisis" class="card row" style="margin-top:18px">
+  <h2>📑 Análisis semanal</h2>
+  <div id="listaAnalisis" class="chips"></div>
+    </section>
         <!-- Sección de dashboards -->
         <!-- Sección de dashboards -->
     <section id="dashboards" class="card row" style="margin-top:18px">
@@ -323,6 +327,25 @@
 cargarFechas();
 
     cargarFechas();
+const listaAnalisisDiv = document.getElementById('listaAnalisis');
+
+async function cargarAnalisis() {
+  const r = await fetch(`${API_BASE}/analisis_semanal`);
+  const data = await r.json();
+  if (!data || data.length === 0) {
+    listaAnalisisDiv.innerHTML = '<em>No hay análisis disponibles</em>';
+    return;
+  }
+  listaAnalisisDiv.innerHTML = data.map(a =>
+    `<div class="chip">
+       📄 <a href="${API_BASE}${a.url}" target="_blank">${a.nombre}</a>
+       <a href="${API_BASE}${a.url}" download style="margin-left:10px; font-size:.9rem; color:#12b886; text-decoration:none;">📥 Descargar</a>
+     </div>`
+  ).join('');
+}
+
+cargarAnalisis();
+
   </script>
 </body>
 </html>

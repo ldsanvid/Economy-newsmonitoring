@@ -21,6 +21,15 @@ from email.mime.image import MIMEImage
 from email import encoders
 import base64
 import requests
+import calendar
+import locale
+
+# Configurar locale a español para formatear meses
+try:
+    locale.setlocale(locale.LC_TIME, "es_ES.utf8")
+except:
+    locale.setlocale(locale.LC_TIME, "es_MX.utf8")
+
 
 # ------------------------------
 # 🔑 Configuración API y Flask
@@ -809,6 +818,43 @@ def get_fechas():
     fechas_unicas = sorted(df["Fecha"].dt.date.unique(), reverse=True)
     fechas_str = [f.strftime("%Y-%m-%d") for f in fechas_unicas]
     return jsonify(fechas_str)
+
+# ------------------------------
+# 📑 Endpoint para análisis semanal
+# ------------------------------
+@app.route("/analisis_semanal", methods=["GET"])
+def analisis_semanal():
+    carpeta = "análisis_semanal"
+    os.makedirs(carpeta, exist_ok=True)
+
+    archivos = [
+        f for f in os.listdir(carpeta)
+        if f.lower().endswith(".pdf")
+    ]
+    archivos.sort(reverse=True)  # más recientes primero
+
+    resultados = []
+    for f in archivos:
+        # Extraer fechas del nombre (ej: analisis_2025-08-25_a_2025-08-29.pdf)
+        match = re.search(r"(\d{4}-\d{2}-\d{2})_a_(\d{4}-\d{2}-\d{2})", f)
+        if match:
+            fecha_inicio = datetime.strptime(match.group(1), "%Y-%m-%d")
+            fecha_fin = datetime.strptime(match.group(2), "%Y-%m-%d")
+            nombre_bonito = f"Análisis semanal: {fecha_inicio.day}–{fecha_fin.day} {fecha_fin.strftime('%B %Y')}"
+        else:
+            nombre_bonito = f  # fallback al nombre del archivo
+
+        resultados.append({
+            "nombre": nombre_bonito,
+            "url": f"/analisis/{f}"
+        })
+
+    return jsonify(resultados)
+
+@app.route("/analisis/<path:filename>", methods=["GET"])
+def descargar_analisis(filename):
+    return send_from_directory("analisis_semanal", filename, as_attachment=False)
+
 
 if __name__ == "__main__":
     import os
