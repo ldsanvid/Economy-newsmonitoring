@@ -190,36 +190,52 @@ def extraer_entidades(texto):
 
     return encontrados
 
-# 5️⃣ Filtrar titulares por entidades y sentimiento
+# 5️⃣ Filtrar titulares por entidades y sentimiento (versión mejorada)
 def filtrar_titulares(df_filtrado, entidades, sentimiento_deseado):
     if df_filtrado.empty:
         return pd.DataFrame()
 
     filtro = df_filtrado.copy()
+    condiciones = []
 
+    # Personajes
     if entidades["personajes"]:
-        filtro = filtro[filtro["Título"].str.lower().apply(
-            lambda t: any(p.lower() in t for p in entidades["personajes"])
-        )]
+        condiciones.append(
+            filtro["Título"].str.lower().str.contains(
+                "|".join([p.lower() for p in entidades["personajes"]]),
+                na=False
+            )
+        )
 
+    # Lugares
     if entidades["lugares"]:
-        filtro = filtro[filtro["Cobertura"].str.lower().apply(
-            lambda c: any(l.lower() in c for l in entidades["lugares"])
-        )]
+        condiciones.append(
+            filtro["Cobertura"].str.lower().str.contains(
+                "|".join([l.lower() for l in entidades["lugares"]]),
+                na=False
+            )
+        )
 
+    # Categorías (con sus sinónimos del diccionario)
     if entidades["categorias"]:
         sinonimos = []
         for cat in entidades["categorias"]:
             sinonimos.extend(categorias_dict.get(cat, []))  # todos los sinónimos
             sinonimos.append(cat.lower())  # también el nombre de la categoría
-        filtro = filtro[filtro["Término"].str.lower().apply(
-            lambda cat: any(s in cat for s in sinonimos)
-        )]
+        condiciones.append(
+            filtro["Término"].str.lower().str.contains("|".join(sinonimos), na=False)
+        )
 
+    # Si hubo condiciones → OR entre todas
+    if condiciones:
+        filtro = filtro[pd.concat(condiciones, axis=1).any(axis=1)]
+
+    # Filtrar por sentimiento si aplica
     if sentimiento_deseado:
         filtro = filtro[filtro["Sentimiento"] == sentimiento_deseado]
 
     return filtro
+
 
 
 # 6️⃣ Seleccionar titulares más relevantes (TF-IDF + coseno)
