@@ -471,7 +471,11 @@ Noticias no relacionadas con aranceles:
         # Convertir a OrderedDict
         economia_dict = OrderedDict()
         for col in ORDEN_COLUMNAS:
-            economia_dict[col] = economia_dia.iloc[0].get(col, "")
+            if col in economia_dia.columns:
+                economia_dict[col] = economia_dia.iloc[0][col]
+            else:
+                economia_dict[col] = ""
+
 
     # 📰 Titulares sin repetir medios
     titulares_info = []
