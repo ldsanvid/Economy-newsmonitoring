@@ -235,13 +235,14 @@
       fechaSelect.innerHTML = `<option value="">Selecciona una fecha…</option>` + data.map(f=>`<option value="${f}">${f}</option>`).join('');
     }
 
-    function renderIndicadores(orden, economia) {
-      if (!orden || !economia) {
-        indicadoresBody.innerHTML = '<tr><td colspan="2"><em>No hay datos</em></td></tr>';
-        return;
-      }
-      indicadoresBody.innerHTML = orden.map(col => `<tr><td>${col}</td><td>${economia[col] || ""}</td></tr>`).join('');
-    }
+function renderIndicadores(orden, economia) {
+  if (!orden || !economia || economia.length === 0) {
+    indicadoresBody.innerHTML = '<tr><td colspan="2"><em>No hay datos</em></td></tr>';
+    return;
+  }
+  const econ = economia[0];  // 👈 primer dict dentro de la lista
+  indicadoresBody.innerHTML = orden.map(col => `<tr><td>${col}</td><td>${econ[col] || ""}</td></tr>`).join('');
+}
 
 
     function renderTitulares(list, target, tituloBloque = '') {
