@@ -58,8 +58,15 @@ df_economia = pd.merge(df_tipo_cambio, df_tasas, on=["Año", "Fecha"], how="oute
 df_sofr = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Treasuries_SOFR")
 df_wall = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Wallstreet")
 df_infl_us = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónUS")
-df_infl_us = df_infl_us.rename(columns={"Inflación USA": "Inflación EE.UU."})
+df_infl_us = df_infl_us.rename(columns={
+    "Inflación Anual": "Inflación Anual US",
+    "Inflación Subyacente": "Inflación Subyacente US"
+})
 df_infl_mx = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónMEX")
+df_infl_mx = df_infl_mx.rename(columns={
+    "Inflación Anual": "Inflación Anual MEX",
+    "Inflación Subyacente": "Inflación Subyacente MEX"
+})
 
 # Unificar fechas
 for df_tmp in [df_sofr, df_wall, df_infl_us, df_infl_mx]:
@@ -68,8 +75,14 @@ for df_tmp in [df_sofr, df_wall, df_infl_us, df_infl_mx]:
 # Unir con df_economia
 df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
 df_economia = df_economia.merge(df_sofr[["Fecha", "SOFR"]], on="Fecha", how="left")
-df_economia = df_economia.merge(df_infl_us[["Fecha", "Inflación EE.UU."]], on="Fecha", how="left")
-df_economia = df_economia.merge(df_infl_mx[["Fecha", "Inflación México"]], on="Fecha", how="left")
+df_economia = df_economia.merge(
+    df_infl_us[["Fecha", "Inflación Anual US", "Inflación Subyacente US"]],
+    on="Fecha", how="left"
+)
+df_economia = df_economia.merge(
+    df_infl_mx[["Fecha", "Inflación Anual MEX", "Inflación Subyacente MEX"]],
+    on="Fecha", how="left"
+)
 df_economia = df_economia.merge(df_wall[["Fecha", "% Dow Jones", "% S&P500", "% Nasdaq"]], on="Fecha", how="left")
 
 categorias_dict = {
@@ -390,10 +403,11 @@ Noticias no relacionadas con aranceles:
     # Filtrar datos económicos
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt]
     # Si la inflación USA está vacía en el día seleccionado, usar el valor más reciente disponible
-    if economia_dia["Inflación EE.UU."].isnull().all() or economia_dia["Inflación EE.UU."].iloc[0] in ["", None]:
-        inflacion_usa_reciente = df_economia["Inflación EE.UU."].dropna().replace("", np.nan).dropna().iloc[-1]
-        economia_dia["Inflación EE.UU."] = inflacion_usa_reciente
-
+    for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
+            "Inflación Anual US", "Inflación Subyacente US"]:
+        if col in economia_dia.columns:
+            economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
+            economia_dia[col] = economia_dia[col].apply(formatear_porcentaje)
 
     # Si no hay datos exactos, usar el más reciente antes de esa fecha
     if economia_dia.empty:
@@ -416,12 +430,18 @@ Noticias no relacionadas con aranceles:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
                 economia_dia[col] = economia_dia[col].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
         
-        # Inflaciones
-        for col in ["Inflación México", "Inflación EE.UU."]:
+        # Inflaciones (formatear siempre con %)
+        def formatear_porcentaje(x):
+            if pd.isnull(x):
+                return ""
+            # Si es decimal (0.034 → 3.4%) o ya viene como 3.4 (→ 3.4%)
+            return f"{(x*100 if abs(x) <= 1 else x):.2f}%"
+
+        for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
+                    "Inflación Anual US", "Inflación Subyacente US"]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
-                economia_dia[col] = economia_dia[col].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
-
+                economia_dia[col] = economia_dia[col].apply(formatear_porcentaje)
 
         # Reordenar columnas según el orden deseado
         # Reordenar columnas y agregar nuevos indicadores
@@ -437,8 +457,10 @@ Noticias no relacionadas con aranceles:
             "% Dow Jones",
             "% S&P500",
             "% Nasdaq",
-            "Inflación México",
-            "Inflación EE.UU."
+            "Inflación Anual MEX",
+            "Inflación Subyacente MEX",
+            "Inflación Anual US",
+            "Inflación Subyacente US"
         ]
         def format_porcentaje_directo(x):
             try:
@@ -655,42 +677,76 @@ def enviar_email():
     # ☁️ Nube
     archivo_nube = os.path.join("nubes", f"nube_{fecha_str}.png")
 
-    # 📊 Indicadores económicos
+        # 📊 Indicadores económicos
     fecha_dt = pd.to_datetime(fecha_str).date()
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt].copy()
-    if "Inflación EE.UU." in economia_dia.columns and economia_dia["Inflación EE.UU."].isnull().all():
-        inflacion_usa_reciente = df_economia["Inflación EE.UU."].dropna().iloc[-1]
-        economia_dia["Inflación EE.UU."] = inflacion_usa_reciente
-    
+
+    # Si no hay dato exacto, usar el último disponible para las 4 inflaciones
+    for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
+                "Inflación Anual US", "Inflación Subyacente US"]:
+        if col in df_economia.columns:
+            if economia_dia.empty or economia_dia[col].isnull().all() or economia_dia[col].iloc[0] in ["", None]:
+                valor_reciente = df_economia[col].dropna().iloc[-1]
+                economia_dia[col] = valor_reciente
+
     if not economia_dia.empty:
         df_formateada = economia_dia.copy()
 
         # Columnas en dólares
-        cols_dolar = ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]
-        for col in cols_dolar:
+        for col in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
             if col in df_formateada.columns:
+                df_formateada[col] = pd.to_numeric(df_formateada[col], errors="coerce")
                 df_formateada[col] = df_formateada[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
 
-        # Columnas en porcentaje
-        cols_porcentaje = [
-            "Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
-            "SOFR", "Inflación EE.UU.", "Inflación México",
-            "% Dow Jones", "% S&P500", "% Nasdaq"
-        ]
-        for col in cols_porcentaje:
-            if col in df_formateada.columns:
-                df_formateada[col] = df_formateada[col].apply(lambda x: f"{x*100:.2f}%" if pd.notnull(x) else "")
+        # Función segura de porcentaje (para TIIEs e Inflaciones)
+        def formatear_porcentaje(x):
+            if pd.isnull(x):
+                return ""
+            return f"{(x*100 if abs(x) <= 1 else x):.2f}%"
 
+        # Formateo especial para SOFR
+        def format_porcentaje_directo(x):
+            try:
+                x_clean = str(x).replace('%','').strip()
+                return f"{float(x_clean)*100:.2f}%"
+            except:
+                return ""
+
+        # Formateo especial para índices de Wall Street (con signo)
+        def format_signed_pct(x):
+            try:
+                x_clean = str(x).replace('%','').strip()
+                return f"{float(x_clean)*100:+.2f}%"
+            except:
+                return ""
+
+        # Aplicar formateos
+        for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
+                    "Inflación Anual MEX", "Inflación Subyacente MEX",
+                    "Inflación Anual US", "Inflación Subyacente US"]:
+            if col in df_formateada.columns:
+                df_formateada[col] = pd.to_numeric(df_formateada[col], errors="coerce")
+                df_formateada[col] = df_formateada[col].apply(formatear_porcentaje)
+
+        if "SOFR" in df_formateada.columns:
+            df_formateada["SOFR"] = df_formateada["SOFR"].apply(format_porcentaje_directo)
+
+        for col in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
+            if col in df_formateada.columns:
+                df_formateada[col] = df_formateada[col].apply(format_signed_pct)
+
+        # Pasar a OrderedDict
         economia_dict = OrderedDict()
         for col in df_formateada.columns[1:]:
             economia_dict[col] = df_formateada.iloc[0][col]
 
-        # 🔹 Construcción manual en 3 filas fijas
+        # 🔹 Construcción manual en filas
         filas = [
             ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"],
             ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"],
             ["SOFR", "% Dow Jones", "% S&P500", "% Nasdaq"],
-            ["Inflación México", "Inflación EE.UU."]
+            ["Inflación Anual MEX", "Inflación Subyacente MEX",
+             "Inflación Anual US", "Inflación Subyacente US"]
         ]
 
         indicadores_html = ""
@@ -707,6 +763,7 @@ def enviar_email():
             indicadores_html += "</div>"
     else:
         indicadores_html = "<p>No hay datos económicos</p>"
+
 
 
 
