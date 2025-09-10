@@ -236,12 +236,13 @@
     }
 
     function renderIndicadores(orden, economia) {
-      if (!orden || !economia || economia.length === 0) {
+      if (!orden || !economia) {
         indicadoresBody.innerHTML = '<tr><td colspan="2"><em>No hay datos</em></td></tr>';
         return;
       }
-      indicadoresBody.innerHTML = orden.map(col => `<tr><td>${col}</td><td>${economia[0][col]}</td></tr>`).join('');
+      indicadoresBody.innerHTML = orden.map(col => `<tr><td>${col}</td><td>${economia[col] || ""}</td></tr>`).join('');
     }
+
 
     function renderTitulares(list, target, tituloBloque = '') {
       if (!list || list.length === 0) {
