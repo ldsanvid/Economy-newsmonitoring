@@ -855,14 +855,15 @@ def enviar_email():
             msg.attach(logo)        
 
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(remitente, password)
+        server = smtplib.SMTP("smtp.office365.com", 587)  # 🔹 Outlook
+        server.starttls()  # encriptación TLS
+        server.login(remitente, password)  # remitente = tu correo Outlook
         server.sendmail(remitente, destinatario, msg.as_string())
         server.quit()
         return jsonify({"mensaje": f"✅ Correo enviado a {destinatario}"})
     except Exception as e:
         return jsonify({"mensaje": f"❌ Error al enviar correo: {e}"})
+
 
 @app.route("/nube/<filename>")
 def serve_nube(filename):
