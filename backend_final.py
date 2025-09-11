@@ -19,6 +19,8 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email import encoders
+from email.utils import formataddr
+
 import base64
 import requests
 import calendar
@@ -766,12 +768,12 @@ def enviar_email():
 
 
     # ---- CONFIGURACIÓN DEL CORREO ----
-    remitente = "ldsantiagovidargas.93@gmail.com"
-    password = os.environ.get("GMAIL_PASSWORD_APP")
-    destinatario = email
+    remitente = os.environ.get("OUTLOOK_USER")   # "monitoreo.plus@outlook.com"
+    password = os.environ.get("OUTLOOK_PASS")
+    destinatario = email    
 
     msg = MIMEMultipart()
-    msg["From"] = remitente
+    msg["From"] = formataddr(("Monitoreo +", remitente))  # 👈 nombre visible
     msg["To"] = destinatario
     msg["Subject"] = f"Resumen de noticias {fecha_str}"
 
