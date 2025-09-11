@@ -463,7 +463,15 @@ Noticias no relacionadas con aranceles:
     if economia_dia.empty:
         ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
         economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
-
+    # 🔹 Forzar que inflaciones usen el valor más reciente disponible si no hay dato exacto
+    for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
+                "Inflación Anual US", "Inflación Subyacente US"]:
+        if col in df_economia.columns:
+            if economia_dia.empty or economia_dia[col].isnull().all() or economia_dia[col].iloc[0] in ["", None]:
+                df_sorted = df_economia.sort_values("Fecha")
+                valor_reciente = df_sorted[col].dropna().iloc[-1]
+                economia_dia[col] = valor_reciente
+                
     if economia_dia.empty:
         economia_dict = {}
     else:
@@ -697,6 +705,7 @@ def enviar_email():
                 "Inflación Anual US", "Inflación Subyacente US"]:
         if col in df_economia.columns:
             if economia_dia.empty or economia_dia[col].isnull().all() or economia_dia[col].iloc[0] in ["", None]:
+                df_sorted = df_economia.sort_values("Fecha")
                 valor_reciente = df_economia[col].dropna().iloc[-1]
                 economia_dia[col] = valor_reciente
 
