@@ -170,35 +170,34 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - GOP es el Partido Republicano estadounidense.
 - Verónica Delgadillo es la actual Alcaldesa de Guadalajara 
 """
-# 1️⃣ Extraer fecha desde texto
+
 def extraer_fechas(pregunta):
     pregunta = pregunta.lower()
 
     # Caso 1: rango tipo "del 25 al 29 de agosto"
-    match = re.search(r"del\s+(\d{1,2})\s+al\s+(\d{1,2}\s+de\s+[a-záéíóú]+)", pregunta)
+    match = re.search(r"del\s+(\d{1,2})\s+al\s+(\d{1,2})\s+de\s+([a-záéíóú]+)", pregunta)
     if match:
-        dia_inicio, resto = match.groups()
-        fecha_inicio = dateparser.parse(dia_inicio + " " + resto, languages=['es'])
-        fecha_fin = dateparser.parse(resto, languages=['es'])
+        dia_inicio, dia_fin, mes = match.groups()
+        fecha_inicio = dateparser.parse(f"{dia_inicio} {mes}", languages=['es'])
+        fecha_fin = dateparser.parse(f"{dia_fin} {mes}", languages=['es'])
         return fecha_inicio.date(), fecha_fin.date()
 
     # Caso 2: rango tipo "entre el 25 y el 29 de agosto"
-    match = re.search(r"entre\s+el\s+(\d{1,2})\s+y\s+el\s+(\d{1,2}\s+de\s+[a-záéíóú]+)", pregunta)
+    match = re.search(r"entre\s+el\s+(\d{1,2})\s+y\s+el\s+(\d{1,2})\s+de\s+([a-záéíóú]+)", pregunta)
     if match:
-        dia_inicio, resto = match.groups()
-        fecha_inicio = dateparser.parse(dia_inicio + " " + resto, languages=['es'])
-        fecha_fin = dateparser.parse(resto, languages=['es'])
+        dia_inicio, dia_fin, mes = match.groups()
+        fecha_inicio = dateparser.parse(f"{dia_inicio} {mes}", languages=['es'])
+        fecha_fin = dateparser.parse(f"{dia_fin} {mes}", languages=['es'])
         return fecha_inicio.date(), fecha_fin.date()
 
     # Caso 3: una sola fecha "el 27 de agosto"
-    match = re.search(r"\d{1,2}\s+de\s+[a-záéíóú]+(?:\s+de\s+\d{4})?", pregunta)
+    match = re.search(r"(\d{1,2}\s+de\s+[a-záéíóú]+(?:\s+de\s+\d{4})?)", pregunta)
     if match:
         fecha = dateparser.parse(match.group(), languages=['es'])
         return fecha.date(), fecha.date()
 
     # Caso 4: sin fecha → None, None
     return None, None
-
 
 # 2️⃣ Obtener fecha más reciente disponible
 def obtener_fecha_mas_reciente(df):
