@@ -770,7 +770,7 @@ def enviar_email():
     # ---- CONFIGURACIÓN DEL CORREO ----
     remitente = os.environ.get("OUTLOOK_USER")   # "monitoreo.plus@outlook.com"
     password = os.environ.get("OUTLOOK_PASS")
-    destinatario = email    
+    destinatario = email
 
     msg = MIMEMultipart()
     msg["From"] = formataddr(("Monitoreo +", remitente))  # 👈 nombre visible
