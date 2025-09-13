@@ -768,8 +768,9 @@ def enviar_email():
 
 
     # ---- CONFIGURACIÓN DEL CORREO ----
-    remitente = os.environ.get("OUTLOOK_USER")   # "monitoreo.plus@outlook.com"
-    password = os.environ.get("OUTLOOK_PASS")
+    remitente = os.environ.get("GMAIL_USER")
+    password = os.environ.get("GMAIL_PASS")
+
     destinatario = email
 
     msg = MIMEMultipart()
@@ -857,12 +858,10 @@ def enviar_email():
             msg.attach(logo)        
 
     try:
-        server = smtplib.SMTP("smtp.office365.com", 587)  # 🔹 Outlook
-        server.starttls()  # encriptación TLS
-        server.login(remitente, password)  # remitente = tu correo Outlook
-        server.sendmail(remitente, destinatario, msg.as_string())
-        server.quit()
-        return jsonify({"mensaje": f"✅ Correo enviado a {destinatario}"})
+        server = smtplib.SMTP("smtp.gmail.com", 587)  # Gmail
+        server.starttls()
+        server.login(remitente, password)
+
     except Exception as e:
         return jsonify({"mensaje": f"❌ Error al enviar correo: {e}"})
 
