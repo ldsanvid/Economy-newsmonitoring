@@ -465,14 +465,14 @@ Noticias no relacionadas con aranceles:
     if economia_dia.empty:
         ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
         economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
-    # 🔹 Forzar que inflaciones usen el valor más reciente disponible si no hay dato exacto
+# 🔹 Forzar que inflaciones usen siempre el valor más reciente disponible
     for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
                 "Inflación Anual US", "Inflación Subyacente US"]:
         if col in df_economia.columns:
-            if economia_dia.empty or economia_dia[col].isnull().all() or economia_dia[col].iloc[0] in ["", None]:
-                df_sorted = df_economia.sort_values("Fecha")
-                valor_reciente = df_sorted[col].dropna().iloc[-1]
-                economia_dia[col] = valor_reciente
+            df_sorted = df_economia.sort_values("Fecha")
+            valor_reciente = df_sorted[col].dropna().iloc[-1] if not df_sorted[col].dropna().empty else None
+            economia_dia[col] = valor_reciente
+
                 
     if economia_dia.empty:
         economia_dict = {}
@@ -702,14 +702,13 @@ def enviar_email():
     fecha_dt = pd.to_datetime(fecha_str).date()
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt].copy()
 
-    # Si no hay dato exacto, usar el último disponible para las 4 inflaciones
+    # 🔹 Forzar que inflaciones usen siempre el valor más reciente disponible
     for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
                 "Inflación Anual US", "Inflación Subyacente US"]:
         if col in df_economia.columns:
-            if economia_dia.empty or economia_dia[col].isnull().all() or economia_dia[col].iloc[0] in ["", None]:
-                df_sorted = df_economia.sort_values("Fecha")
-                valor_reciente = df_economia[col].dropna().iloc[-1]
-                economia_dia[col] = valor_reciente
+            df_sorted = df_economia.sort_values("Fecha")
+            valor_reciente = df_sorted[col].dropna().iloc[-1] if not df_sorted[col].dropna().empty else None
+            economia_dia[col] = valor_reciente
 
     if not economia_dia.empty:
         df_formateada = economia_dia.copy()
