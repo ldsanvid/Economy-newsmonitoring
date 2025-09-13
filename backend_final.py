@@ -861,9 +861,14 @@ def enviar_email():
         server = smtplib.SMTP("smtp.gmail.com", 587)  # Gmail
         server.starttls()
         server.login(remitente, password)
-
+        server.sendmail(remitente, destinatario, msg.as_string())  # 👈 enviar
+        server.quit()
+        return jsonify({"mensaje": f"✅ Correo enviado a {destinatario}"})
+    
     except Exception as e:
+    
         return jsonify({"mensaje": f"❌ Error al enviar correo: {e}"})
+
 
 
 @app.route("/nube/<filename>")
