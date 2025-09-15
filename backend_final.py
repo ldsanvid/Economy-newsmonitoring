@@ -107,9 +107,10 @@ df_infl_mx = df_infl_mx.rename(columns={
     "Inflación Subyacente": "Inflación Subyacente MEX"
 })
 
-# Unificar fechas
-for df_tmp in [df_sofr, df_wall, df_infl_us, df_infl_mx]:
+# 🔄 Normalizar fechas para que todas las hojas tengan el mismo formato date
+for df_tmp in [df_tipo_cambio, df_tasas, df_sofr, df_wall, df_infl_us, df_infl_mx]:
     df_tmp["Fecha"] = pd.to_datetime(df_tmp["Fecha"], errors="coerce").dt.date
+
 
 # Unir con df_economia
 df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
@@ -517,16 +518,21 @@ Noticias no relacionadas con aranceles:
         for _, row in df_origen.iterrows():
             medio = row["Fuente"]
             if medio not in usados_medios:
+                idioma = "es"
+                if "Idioma" in row and str(row["Idioma"]).lower() in ["en", "ingles", "inglés"]:
+                    idioma = "en"
+
                 titulares_info.append({
                     "titulo": row["Título"],
                     "medio": medio,
                     "enlace": row["Enlace"],
-                    "idioma": "es"
+                    "idioma": idioma
                 })
                 usados_medios.add(medio)
                 added += 1
             if added >= max_count:
                 break
+
 
     # 2 nacionales + 2 locales + 2 internacionales + 2 otros = 8 titulares distintos
     agregar_titulares(noticias_nacionales, 2)
