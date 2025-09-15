@@ -464,8 +464,12 @@ Noticias no relacionadas con aranceles:
     generar_nube(noticias_dia["Título"].tolist(), archivo_nube_path)
 
     # 📊 Indicadores económicos
+    df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
+
+    # Filtrar datos económicos por fecha
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt]
 
+    # Si no hay datos exactos, usar el más reciente antes de esa fecha
     if economia_dia.empty:
         ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
         economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
@@ -475,51 +479,50 @@ Noticias no relacionadas con aranceles:
     else:
         economia_dia = economia_dia.copy()
 
-    # 🔹 Rellenar inflación si viene vacía en esta fecha
-    for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
-                "Inflación Anual US", "Inflación Subyacente US"]:
-        if col in df_economia.columns:
-            valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
-            if not valores_previos.empty:
-                economia_dia[col] = valores_previos.iloc[-1]
-    # --- DEBUG: Inflación seleccionada ---
-    for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
-                "Inflación Anual US", "Inflación Subyacente US"]:
-        if col in df_economia.columns:
-            valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
-            if not valores_previos.empty:
-                print(f"📊 DEBUG {col} -> Fecha usada: {fecha_dt}, Valor mostrado: {valores_previos.iloc[-1]}")
-            else:
-                print(f"📊 DEBUG {col} -> Fecha usada: {fecha_dt}, Valor mostrado: VACÍO")
-
-
-    # Formateo
-    for col in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
-        if col in economia_dia.columns:
-            economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
-            economia_dia[col] = economia_dia[col].apply(lambda x: f"${x:.2f}" if pd.notnull(x) else "")
-
-        for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
-                    "Inflación Anual MEX", "Inflación Subyacente MEX",
-                    "Inflación Anual US", "Inflación Subyacente US"]:
+        # 🔹 Tipo de cambio
+        for col in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
-                economia_dia[col] = economia_dia[col].apply(formatear_porcentaje)
+                economia_dia[col] = economia_dia[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
 
-            if "SOFR" in economia_dia.columns:
-                economia_dia["SOFR"] = economia_dia["SOFR"].apply(format_porcentaje_directo)
-
-            for col in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
-                if col in economia_dia.columns:
-                    economia_dia[col] = economia_dia[col].apply(format_signed_pct)
-
-        # Convertir a OrderedDict
-        economia_dict = OrderedDict()
-        for col in ORDEN_COLUMNAS:
+        # 🔹 Tasas
+        for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
             if col in economia_dia.columns:
-                economia_dict[col] = economia_dia.iloc[0][col]
-            else:
-                economia_dict[col] = ""
+                economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
+                economia_dia[col] = economia_dia[col].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "")
+
+        # 🔹 SOFR
+        if "SOFR" in economia_dia.columns:
+            economia_dia["SOFR"] = economia_dia["SOFR"].apply(format_porcentaje_directo)
+
+        # 🔹 Bolsas
+        for col in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
+            if col in economia_dia.columns:
+                economia_dia[col] = economia_dia[col].apply(format_signed_pct)
+
+        # 🔹 Inflación: siempre tomar el último dato disponible
+        for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
+                    "Inflación Anual US", "Inflación Subyacente US"]:
+            if col in df_economia.columns:
+                valores = df_economia[col].dropna()
+                if not valores.empty:
+                    ultimo_valor = pd.to_numeric(valores.iloc[-1], errors="coerce")
+                    economia_dia[col] = f"{ultimo_valor:.2f}%" if pd.notnull(ultimo_valor) else ""
+
+        # Ordenar columnas
+        orden_columnas = [
+            "Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo",
+            "Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
+            "SOFR", "% Dow Jones", "% S&P500", "% Nasdaq",
+            "Inflación Anual MEX", "Inflación Subyacente MEX",
+            "Inflación Anual US", "Inflación Subyacente US"
+        ]
+
+        economia_dia = economia_dia.reindex(columns=orden_columnas)
+        economia_dict = OrderedDict()
+        for col in orden_columnas:
+            economia_dict[col] = economia_dia.iloc[0][col]
+
 
 
     # 📰 Titulares sin repetir medios
@@ -726,9 +729,12 @@ def enviar_email():
 
         # 📊 Indicadores económicos
     # 📊 Indicadores económicos
-    fecha_dt = pd.to_datetime(fecha_str).date()
+    df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
+
+    # Filtrar datos económicos por fecha
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt]
 
+    # Si no hay datos exactos, usar el más reciente antes de esa fecha
     if economia_dia.empty:
         ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
         economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
@@ -736,53 +742,44 @@ def enviar_email():
     if not economia_dia.empty:
         economia_dia = economia_dia.copy()
 
-        # 🔹 Rellenar inflación si viene vacía en esta fecha
-        for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
-                    "Inflación Anual US", "Inflación Subyacente US"]:
-            if col in df_economia.columns:
-                valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
-                if not valores_previos.empty:
-                    economia_dia[col] = valores_previos.iloc[-1]
-
-            # --- DEBUG: Inflación seleccionada ---
-        for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
-                    "Inflación Anual US", "Inflación Subyacente US"]:
-            if col in df_economia.columns:
-                valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
-                if not valores_previos.empty:
-                    print(f"📊 DEBUG {col} -> Fecha usada: {fecha_dt}, Valor mostrado: {valores_previos.iloc[-1]}")
-                else:
-                    print(f"📊 DEBUG {col} -> Fecha usada: {fecha_dt}, Valor mostrado: VACÍO")
-
-
-    if not economia_dia.empty:
-        df_formateada = economia_dia.copy()
-
-        # Columnas en dólares
+        # 🔹 Tipo de cambio
         for col in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
-            if col in df_formateada.columns:
-                df_formateada[col] = pd.to_numeric(df_formateada[col], errors="coerce")
-                df_formateada[col] = df_formateada[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
+            if col in economia_dia.columns:
+                economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
+                economia_dia[col] = economia_dia[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
 
-        # Aplicar formateos
-        for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
-                    "Inflación Anual MEX", "Inflación Subyacente MEX",
-                    "Inflación Anual US", "Inflación Subyacente US"]:
-            if col in df_formateada.columns:
-                df_formateada[col] = pd.to_numeric(df_formateada[col], errors="coerce")
-                df_formateada[col] = df_formateada[col].apply(formatear_porcentaje)
+        # 🔹 Tasas
+        for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
+            if col in economia_dia.columns:
+                economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
+                economia_dia[col] = economia_dia[col].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "")
 
-        if "SOFR" in df_formateada.columns:
-            df_formateada["SOFR"] = df_formateada["SOFR"].apply(format_porcentaje_directo)
+        # 🔹 SOFR
+        if "SOFR" in economia_dia.columns:
+            economia_dia["SOFR"] = economia_dia["SOFR"].apply(format_porcentaje_directo)
 
+        # 🔹 Bolsas
         for col in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
-            if col in df_formateada.columns:
-                df_formateada[col] = df_formateada[col].apply(format_signed_pct)
+            if col in economia_dia.columns:
+                economia_dia[col] = economia_dia[col].apply(format_signed_pct)
 
-        # Pasar a OrderedDict
+        # 🔹 Inflación: siempre tomar el último dato disponible
+        for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
+                    "Inflación Anual US", "Inflación Subyacente US"]:
+            if col in df_economia.columns:
+                valores = df_economia[col].dropna()
+                if not valores.empty:
+                    ultimo_valor = pd.to_numeric(valores.iloc[-1], errors="coerce")
+                    economia_dia[col] = f"{ultimo_valor:.2f}%" if pd.notnull(ultimo_valor) else ""
+
+        # Ordenar columnas
+        economia_dia = economia_dia.reindex(columns=ORDEN_COLUMNAS)
         economia_dict = OrderedDict()
         for col in ORDEN_COLUMNAS:
-            economia_dict[col] = df_formateada.iloc[0][col]
+            economia_dict[col] = economia_dia.iloc[0][col]
+    else:
+        economia_dict = {}
+
 
         # 🔹 Construcción manual en filas
         filas = [
@@ -804,12 +801,9 @@ def enviar_email():
                     <div style="font-size:1.1rem; font-weight:700; color:#111;">{valor}</div>
                 </div>
                 """
-            indicadores_html += "</div>"
-    else:
-        indicadores_html = "<p>No hay datos económicos</p>"
-
-
-
+                indicadores_html += "</div>"
+        else:
+            indicadores_html = "<p>No hay datos económicos</p>"
 
     # ---- CONFIGURACIÓN DEL CORREO ----
     remitente = os.environ.get("GMAIL_USER")
