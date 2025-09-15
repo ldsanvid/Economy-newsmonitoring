@@ -469,17 +469,35 @@ Noticias no relacionadas con aranceles:
     if economia_dia.empty:
         ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
         economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
-                
+
     if economia_dia.empty:
         economia_dict = {}
     else:
         economia_dia = economia_dia.copy()
 
-        # Formateo
-        for col in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
-            if col in economia_dia.columns:
-                economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
-                economia_dia[col] = economia_dia[col].apply(lambda x: f"${x:.2f}" if pd.notnull(x) else "")
+    # 🔹 Rellenar inflación si viene vacía en esta fecha
+    for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
+                "Inflación Anual US", "Inflación Subyacente US"]:
+        if col in df_economia.columns:
+            valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
+            if not valores_previos.empty:
+                economia_dia[col] = valores_previos.iloc[-1]
+    # --- DEBUG: Inflación seleccionada ---
+    for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
+                "Inflación Anual US", "Inflación Subyacente US"]:
+        if col in df_economia.columns:
+            valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
+            if not valores_previos.empty:
+                print(f"📊 DEBUG {col} -> Fecha usada: {fecha_dt}, Valor mostrado: {valores_previos.iloc[-1]}")
+            else:
+                print(f"📊 DEBUG {col} -> Fecha usada: {fecha_dt}, Valor mostrado: VACÍO")
+
+
+    # Formateo
+    for col in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
+        if col in economia_dia.columns:
+            economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
+            economia_dia[col] = economia_dia[col].apply(lambda x: f"${x:.2f}" if pd.notnull(x) else "")
 
         for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
                     "Inflación Anual MEX", "Inflación Subyacente MEX",
@@ -488,12 +506,12 @@ Noticias no relacionadas con aranceles:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
                 economia_dia[col] = economia_dia[col].apply(formatear_porcentaje)
 
-        if "SOFR" in economia_dia.columns:
-            economia_dia["SOFR"] = economia_dia["SOFR"].apply(format_porcentaje_directo)
+            if "SOFR" in economia_dia.columns:
+                economia_dia["SOFR"] = economia_dia["SOFR"].apply(format_porcentaje_directo)
 
-        for col in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
-            if col in economia_dia.columns:
-                economia_dia[col] = economia_dia[col].apply(format_signed_pct)
+            for col in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
+                if col in economia_dia.columns:
+                    economia_dia[col] = economia_dia[col].apply(format_signed_pct)
 
         # Convertir a OrderedDict
         economia_dict = OrderedDict()
@@ -707,16 +725,35 @@ def enviar_email():
     archivo_nube = os.path.join("nubes", f"nube_{fecha_str}.png")
 
         # 📊 Indicadores económicos
+    # 📊 Indicadores económicos
     fecha_dt = pd.to_datetime(fecha_str).date()
-    economia_dia = df_economia[df_economia["Fecha"] == fecha_dt].copy()
+    economia_dia = df_economia[df_economia["Fecha"] == fecha_dt]
 
-    # 🔹 Forzar que inflaciones usen siempre el valor más reciente disponible
-    for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
-                "Inflación Anual US", "Inflación Subyacente US"]:
-        if col in df_economia.columns:
-            df_sorted = df_economia.sort_values("Fecha")
-            valor_reciente = df_sorted[col].dropna().iloc[-1] if not df_sorted[col].dropna().empty else None
-            economia_dia[col] = valor_reciente
+    if economia_dia.empty:
+        ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
+        economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
+
+    if not economia_dia.empty:
+        economia_dia = economia_dia.copy()
+
+        # 🔹 Rellenar inflación si viene vacía en esta fecha
+        for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
+                    "Inflación Anual US", "Inflación Subyacente US"]:
+            if col in df_economia.columns:
+                valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
+                if not valores_previos.empty:
+                    economia_dia[col] = valores_previos.iloc[-1]
+
+            # --- DEBUG: Inflación seleccionada ---
+        for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
+                    "Inflación Anual US", "Inflación Subyacente US"]:
+            if col in df_economia.columns:
+                valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
+                if not valores_previos.empty:
+                    print(f"📊 DEBUG {col} -> Fecha usada: {fecha_dt}, Valor mostrado: {valores_previos.iloc[-1]}")
+                else:
+                    print(f"📊 DEBUG {col} -> Fecha usada: {fecha_dt}, Valor mostrado: VACÍO")
+
 
     if not economia_dia.empty:
         df_formateada = economia_dia.copy()
