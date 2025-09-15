@@ -125,6 +125,9 @@ df_economia = df_economia.merge(
 )
 df_economia = df_economia.merge(df_wall[["Fecha", "% Dow Jones", "% S&P500", "% Nasdaq"]], on="Fecha", how="left")
 
+# 🔄 Normalizar Fecha de df_economia después de todos los merges
+df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
+
 categorias_dict = {
         "Aranceles": ["arancel","tarifas", "restricciones comerciales","tariff","aranceles"],
         "Parque Industrial": ["zona industrial","parque industrial"],
@@ -466,14 +469,6 @@ Noticias no relacionadas con aranceles:
     if economia_dia.empty:
         ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
         economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
-# 🔹 Forzar que inflaciones usen siempre el valor más reciente disponible
-    for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
-                "Inflación Anual US", "Inflación Subyacente US"]:
-        if col in df_economia.columns:
-            df_sorted = df_economia.sort_values("Fecha")
-            valor_reciente = df_sorted[col].dropna().iloc[-1] if not df_sorted[col].dropna().empty else None
-            economia_dia[col] = valor_reciente
-
                 
     if economia_dia.empty:
         economia_dict = {}
@@ -513,15 +508,20 @@ Noticias no relacionadas con aranceles:
     titulares_info = []
     usados_medios = set()
 
-    def agregar_titulares(df_origen, max_count):
+    def agregar_titulares(df_origen, max_count, idioma_filtrado="es"):
         added = 0
         for _, row in df_origen.iterrows():
             medio = row["Fuente"]
-            if medio not in usados_medios:
+            idioma = str(row.get("Idioma", "es")).strip().lower()
+            if idioma in ["en", "ingles", "inglés"]:
+                idioma = "en"
+            else:
                 idioma = "es"
-                if "Idioma" in row and str(row["Idioma"]).lower() in ["en", "ingles", "inglés"]:
-                    idioma = "en"
 
+            if idioma != idioma_filtrado:
+                continue
+
+            if medio not in usados_medios:
                 titulares_info.append({
                     "titulo": row["Título"],
                     "medio": medio,
@@ -534,11 +534,13 @@ Noticias no relacionadas con aranceles:
                 break
 
 
+
     # 2 nacionales + 2 locales + 2 internacionales + 2 otros = 8 titulares distintos
-    agregar_titulares(noticias_nacionales, 2)
-    agregar_titulares(noticias_locales, 2)
-    agregar_titulares(noticias_internacionales_forzadas, 2)
-    agregar_titulares(noticias_otras_forzadas, 2)
+    agregar_titulares(noticias_nacionales, 2, idioma_filtrado="es")
+    agregar_titulares(noticias_locales, 2, idioma_filtrado="es")
+    agregar_titulares(noticias_internacionales_forzadas, 2, idioma_filtrado="es")
+    agregar_titulares(noticias_otras_forzadas, 2, idioma_filtrado="es")
+
 
     # 📰 Titulares en inglés (máx. 8)
     titulares_info_en = []
