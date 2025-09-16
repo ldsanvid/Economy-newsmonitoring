@@ -778,7 +778,7 @@ def enviar_email():
                 valores = df_economia[col].dropna()
                 if not valores.empty:
                     ultimo_valor = pd.to_numeric(valores.iloc[-1], errors="coerce")
-                    economia_dia[col] = f"{ultimo_valor:.2f}%" if pd.notnull(ultimo_valor) else ""
+                    economia_dia[col] = f"{ultimo_valor*100:.2f}%" if pd.notnull(ultimo_valor) else ""
 
 
         # Ordenar columnas
