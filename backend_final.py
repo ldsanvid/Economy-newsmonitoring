@@ -132,6 +132,8 @@ df_economia = df_economia.merge(df_wall[["Fecha", "% Dow Jones", "% S&P500", "% 
 
 # 🔄 Normalizar Fecha de df_economia después de todos los merges
 df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
+df_economia = df_economia.sort_values("Fecha")
+
 
 categorias_dict = {
         "Aranceles": ["arancel","tarifas", "restricciones comerciales","tariff","aranceles"],
@@ -507,12 +509,13 @@ Noticias no relacionadas con aranceles:
 
         # 🔹 Inflación: siempre tomar el último dato disponible
         for col in ["Inflación Anual MEX", "Inflación Subyacente MEX",
-                    "Inflación Anual US", "Inflación Subyacente US"]:
+            "Inflación Anual US", "Inflación Subyacente US"]:
             if col in df_economia.columns:
-                valores = df_economia[col].dropna()
-                if not valores.empty:
-                    ultimo_valor = pd.to_numeric(valores.iloc[-1], errors="coerce")
+                valores_previos = df_economia[col].dropna()
+                if not valores_previos.empty:
+                    ultimo_valor = pd.to_numeric(valores_previos.iloc[-1], errors="coerce")
                     economia_dia[col] = f"{ultimo_valor*100:.2f}%" if pd.notnull(ultimo_valor) else ""
+
 
         # Ordenar columnas
         orden_columnas = [
@@ -757,7 +760,7 @@ def enviar_email():
         for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
-                economia_dia[col] = economia_dia[col].apply(formatear_porcentaje)
+                economia_dia[col] = economia_dia[col].apply(formatear_porcentaje_decimal)
 
         # 🔹 SOFR
         if "SOFR" in economia_dia.columns:
@@ -776,6 +779,7 @@ def enviar_email():
                 if not valores.empty:
                     ultimo_valor = pd.to_numeric(valores.iloc[-1], errors="coerce")
                     economia_dia[col] = f"{ultimo_valor:.2f}%" if pd.notnull(ultimo_valor) else ""
+
 
         # Ordenar columnas
         economia_dia = economia_dia.reindex(columns=ORDEN_COLUMNAS)
