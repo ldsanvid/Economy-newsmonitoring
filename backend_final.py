@@ -56,7 +56,7 @@ df = df.dropna(subset=["Fecha", "Título"])
 def formatear_porcentaje(x):
     if pd.isnull(x):
         return ""
-    return f"{(x*100 if abs(x) <= 1 else x):.2f}%"
+    return f"{x:.2f}%"
 
 def format_porcentaje_directo(x):
     try:
@@ -489,7 +489,7 @@ Noticias no relacionadas con aranceles:
         for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
-                economia_dia[col] = economia_dia[col].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "")
+                economia_dia[col] = economia_dia[col].apply(formatear_porcentaje)
 
         # 🔹 SOFR
         if "SOFR" in economia_dia.columns:
@@ -746,13 +746,13 @@ def enviar_email():
         for col in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
-                economia_dia[col] = economia_dia[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
+                economia_dia[col] = economia_dia[col].apply(formatear_porcentaje)
 
         # 🔹 Tasas
         for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
-                economia_dia[col] = economia_dia[col].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "")
+                economia_dia[col] = economia_dia[col].apply(formatear_porcentaje)
 
         # 🔹 SOFR
         if "SOFR" in economia_dia.columns:
