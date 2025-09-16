@@ -785,7 +785,7 @@ def enviar_email():
                 valores_previos = df_infl_mx[df_infl_mx["Fecha"] <= fecha_dt][col].dropna()
                 if not valores_previos.empty:
                     ultimo_valor = pd.to_numeric(valores_previos.iloc[-1], errors="coerce")
-                    economia_dia[col] = f"{ultimo_valor*100:.2f}%" if pd.notnull(ultimo_valor) else ""
+                    economia_dia[col] = f"{ultimo_valor:.2f}%" if pd.notnull(ultimo_valor) else ""
 
         # 🔹 Inflación US: se queda leyendo de df_economia
         for col in ["Inflación Anual US", "Inflación Subyacente US"]:
@@ -793,7 +793,7 @@ def enviar_email():
                 valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
                 if not valores_previos.empty:
                     ultimo_valor = pd.to_numeric(valores_previos.iloc[-1], errors="coerce")
-                    economia_dia[col] = f"{ultimo_valor*100:.2f}%" if pd.notnull(ultimo_valor) else ""
+                    economia_dia[col] = f"{ultimo_valor:.2f}%" if pd.notnull(ultimo_valor) else ""
 
 
 
