@@ -777,9 +777,6 @@ def enviar_email():
         economia_dict = OrderedDict()
         for col in ORDEN_COLUMNAS:
             economia_dict[col] = economia_dia.iloc[0][col]
-    else:
-        economia_dict = {}
-
 
         # 🔹 Construcción manual en filas
         filas = [
@@ -801,9 +798,9 @@ def enviar_email():
                     <div style="font-size:1.1rem; font-weight:700; color:#111;">{valor}</div>
                 </div>
                 """
-                indicadores_html += "</div>"
-        else:
-            indicadores_html = "<p>No hay datos económicos</p>"
+            indicadores_html += "</div>"
+    else:
+        indicadores_html = "<p>No hay datos económicos</p>"
 
     # ---- CONFIGURACIÓN DEL CORREO ----
     remitente = os.environ.get("GMAIL_USER")
