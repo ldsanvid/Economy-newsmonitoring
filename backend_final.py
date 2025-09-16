@@ -58,6 +58,11 @@ def formatear_porcentaje(x):
         return ""
     return f"{x:.2f}%"
 
+def formatear_porcentaje_decimal(x):
+    if pd.isnull(x):
+        return ""
+    return f"{x*100:.2f}%"
+
 def format_porcentaje_directo(x):
     try:
         x_clean = str(x).replace('%','').strip()
@@ -489,7 +494,7 @@ Noticias no relacionadas con aranceles:
         for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
-                economia_dia[col] = economia_dia[col].apply(formatear_porcentaje)
+                economia_dia[col] = economia_dia[col].apply(formatear_porcentaje_decimal)
 
         # 🔹 SOFR
         if "SOFR" in economia_dia.columns:
@@ -507,7 +512,7 @@ Noticias no relacionadas con aranceles:
                 valores = df_economia[col].dropna()
                 if not valores.empty:
                     ultimo_valor = pd.to_numeric(valores.iloc[-1], errors="coerce")
-                    economia_dia[col] = f"{ultimo_valor:.2f}%" if pd.notnull(ultimo_valor) else ""
+                    economia_dia[col] = f"{ultimo_valor*100:.2f}%" if pd.notnull(ultimo_valor) else ""
 
         # Ordenar columnas
         orden_columnas = [
