@@ -86,6 +86,83 @@
   0% { background-position: -400px 0; }
   100% { background-position: 400px 0; }
 }
+    /* 📱 Ajustes móviles */
+    @media (max-width: 600px) {
+      header {
+        flex-direction: column;   /* El logo y nav uno debajo del otro */
+        height: auto;
+        padding: 10px;
+      }
+
+      nav {
+        margin-left: 0;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      nav a {
+        font-size: 0.85rem;   /* Texto un poco más chico */
+        padding: 6px 8px;
+      }
+
+      main {
+        margin: 80px auto 20px;
+        padding: 10px;
+      }
+
+      .card {
+        padding: 14px;        /* Menos padding en móvil */
+      }
+
+      button, select, input[type="text"] {
+        width: 100% !important;   /* Que no se desborden */
+        min-width: unset;
+      }
+    }
+/* 📱 Menú hamburguesa */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  cursor: pointer;
+  gap: 4px;
+}
+.hamburger div {
+  width: 25px;
+  height: 3px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: 0.3s;
+}
+/* Animación hamburguesa → X */
+.hamburger.active div:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+.hamburger.active div:nth-child(2) {
+  opacity: 0;
+}
+.hamburger.active div:nth-child(3) {
+  transform: rotate(-45deg) translate(6px, -6px);
+}
+
+/* Mostrar solo en móvil */
+@media (max-width: 600px) {
+  .hamburger { display: flex; }
+  nav { 
+    display: none; 
+    flex-direction: column; 
+    width: 100%; 
+    background: white; 
+    border-top: 1px solid var(--border);
+    margin-top: 10px;
+  }
+  nav.show { display: flex; }
+  nav a { 
+    padding: 12px; 
+    border: none; 
+    border-bottom: 1px solid var(--border); 
+    font-size: 1rem;
+  }
+}
 
   </style>
 </head>
@@ -94,6 +171,9 @@
     <div class="brand">
         Monitoreo<span style="color:var(--brand)">+</span><img src="logo.png" alt="TC Latin America Partners" style="height:30px; margin-left:8px;">
     </div>
+    <div class="hamburger" id="hamburger">
+    <div></div><div></div><div></div>
+  </div>
     <nav>
       <a href="#resumen">Resumen</a>
       <a href="#preguntas">Preguntas</a>
@@ -348,6 +428,14 @@ async function cargarReportes() {
 }
 
 cargarReportes();
+
+// 🍔 Menú hamburguesa toggle
+const hamburger = document.getElementById('hamburger');
+const nav = document.querySelector('header nav');
+hamburger.addEventListener('click', () => {
+  nav.classList.toggle('show');
+  hamburger.classList.toggle('active'); // 👈 activa animación X
+});
 
   </script>
 </body>
