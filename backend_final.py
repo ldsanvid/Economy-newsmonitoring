@@ -147,6 +147,76 @@ categorias_dict = {
         "Industria Automotriz": ["automotriz", "coches", "car industry"],
         "Transporte":["industria de transporte", "transporte de carga"]
     }
+
+# ------------------------------
+# 📊 Diccionarios de mapeo para indicadores económicos
+# ------------------------------
+
+# Tipo de cambio
+mapa_tipo_cambio = {
+    "tipo de cambio fix": "Tipo de Cambio FIX",
+    "fix": "Tipo de Cambio FIX",
+    "nivel máximo del dólar": "Nivel máximo",
+    "dólar máximo": "Nivel máximo",
+    "máximo del dólar": "Nivel máximo",
+    "nivel mínimo del dólar": "Nivel mínimo",
+    "nivel mínimo": "Nivel mínimo",
+    "dólar mínimo": "Nivel mínimo",
+    "mínimo del dólar": "Nivel mínimo"
+}
+
+# Tasas de interés
+mapa_tasas = {
+    "tasa de interés objetivo": "Tasa de Interés Objetivo",
+    "tasa objetivo": "Tasa de Interés Objetivo",
+    "tasa de interés de banxico": "Tasa de Interés Objetivo",
+    "tiie 28": "TIIE 28 días",
+    "tiie de 28 días": "TIIE 28 días",
+    "tiie 91": "TIIE 91 días",
+    "tiie de 91 días": "TIIE 91 días",
+    "tiie 182": "TIIE 182 días",
+    "tiie de 182 días": "TIIE 182 días"
+}
+
+# Inflaciones
+mapa_inflacion = {
+    "inflación anual méxico": "Inflación Anual MEX",
+    "inflación subyacente méxico": "Inflación Subyacente MEX",
+    "inflación de méxico": "Inflación Anual MEX",  # default si dicen solo "México"
+    "inflación anual de estados unidos": "Inflación Anual US",
+    "inflación anual de US": "Inflación Anual US",
+    "inflación subyacente de estados unidos": "Inflación Subyacente US",
+    "inflación subyacente de us": "Inflación Subyacente US",
+    "inflación de estados unidos": "Inflación Anual US",
+    "inflación de eeuu": "Inflación Anual US",
+    "inflación anual de EU": "Inflación Anual US",
+    "inflación subyacente de EU": "Inflación Subyacente US",
+}
+
+# Treasuries (Bonos del Tesoro de EE.UU.)
+mapa_treasuries = {
+    "rendimiento de los treasuries de 1 mes": "1M Treasury",
+    "rendimiento de los treasuries de 3 meses": "3M Treasury",
+    "rendimiento de los treasuries de 6 meses": "6M Treasury",
+    "rendimiento de los treasuries de 1 año": "1Y Treasury",
+    "rendimiento de los treasuries de 2 años": "2Y Treasury",
+    "rendimiento de los treasuries de 3 años": "3Y Treasury",
+    "rendimiento de los treasuries de 5 años": "5Y Treasury",
+    "rendimiento de los treasuries de 7 años": "7Y Treasury",
+    "rendimiento de los treasuries de 10 años": "10Y Treasury",
+    "rendimiento de los treasuries de 20 años": "20Y Treasury",
+    "rendimiento de los treasuries de 30 años": "30Y Treasury",
+    "sofr":"SOFR"
+}
+
+# Índices bursátiles
+mapa_indices = {
+    "dow jones": "% Dow Jones",
+    "s&p": "% S&P500",
+    "s&p 500": "% S&P500",
+    "nasdaq": "% Nasdaq"
+}
+
 # ------------------------------
 # 📜 Contexto político único
 # ------------------------------
@@ -642,10 +712,57 @@ def pregunta():
     if not q:
         return jsonify({"respuesta": "No se proporcionó una pregunta."})
 
-    # 1️⃣ Detectar sentimiento deseado
+    q_lower = q.lower().strip()
+
+    # ------------------------------
+    # 1️⃣ Detectar si la pregunta es sobre indicadores económicos
+    # ------------------------------
+    mapa_general = {**mapa_tipo_cambio, **mapa_tasas, **mapa_inflacion,
+                    **mapa_treasuries, **mapa_indices}
+
+    columna_objetivo = None
+    for key, col in mapa_general.items():
+        if key in q_lower:
+            columna_objetivo = col
+            break
+
+    if columna_objetivo:
+        # 2️⃣ Detectar fecha o rango
+        fecha_inicio, fecha_fin = extraer_rango_fechas(q)
+        if not (fecha_inicio and fecha_fin):
+            fecha_inicio, fecha_fin = extraer_fechas(q)
+
+        if fecha_inicio and fecha_fin and fecha_inicio != fecha_fin:
+            # Promedio en rango
+            df_rango = df_economia[(df_economia["Fecha"] >= fecha_inicio) & (df_economia["Fecha"] <= fecha_fin)]
+            if df_rango.empty:
+                return jsonify({"respuesta": f"No encontré datos de {columna_objetivo} entre {fecha_inicio} y {fecha_fin}."})
+            promedio = pd.to_numeric(df_rango[columna_objetivo], errors="coerce").mean()
+            return jsonify({
+                "respuesta": f"El promedio de {columna_objetivo} entre {fecha_inicio} y {fecha_fin} fue {promedio:.2f}.",
+                "columna": columna_objetivo
+            })
+        else:
+            # Valor puntual
+            fecha_dt = fecha_fin or obtener_fecha_mas_reciente(df_economia)
+            df_dia = df_economia[df_economia["Fecha"] == fecha_dt]
+            if df_dia.empty:
+                ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
+                df_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
+            if df_dia.empty:
+                return jsonify({"respuesta": f"No encontré datos de {columna_objetivo} para {fecha_dt}."})
+
+            valor = df_dia[columna_objetivo].values[0]
+            return jsonify({
+                "respuesta": f"El valor de {columna_objetivo} en {fecha_dt} fue {valor}.",
+                "columna": columna_objetivo
+            })
+
+    # ------------------------------
+    # 2️⃣ Si no es indicador económico → lógica de noticias
+    # ------------------------------
     sentimiento_deseado = detectar_sentimiento_deseado(q)
 
-    # 2️⃣ Detectar rango de fechas o fecha única
     fecha_inicio, fecha_fin = extraer_rango_fechas(q)
     if fecha_inicio and fecha_fin:
         df_filtrado = df[(df["Fecha"].dt.date >= fecha_inicio) & (df["Fecha"].dt.date <= fecha_fin)]
@@ -658,44 +775,31 @@ def pregunta():
         fecha_dt = obtener_fecha_mas_reciente(df)
         df_filtrado = df[df["Fecha"].dt.date == fecha_dt]
 
-
-    # 3️⃣ Extraer entidades
     entidades = extraer_entidades(q)
-
-    # 4️⃣ Aplicar filtros de entidades y sentimiento
-    # 4️⃣ Aplicar filtros de entidades y sentimiento sobre todo el rango o fecha
     df_filtrado = filtrar_titulares(df_filtrado, entidades, sentimiento_deseado)
 
-
-    # 5️⃣ Si no hay resultados
     if df_filtrado.empty:
         if fecha_inicio and fecha_fin:
             return jsonify({"respuesta": f"No encontré noticias relacionadas con tu pregunta entre {fecha_inicio} y {fecha_fin}."})
         else:
             return jsonify({"respuesta": f"No encontré noticias relacionadas con tu pregunta para {fecha_dt}."})
 
-    # 6️⃣ Vectorizar titulares y pregunta
     tfidf = TfidfVectorizer()
     tfidf_matrix = tfidf.fit_transform(df_filtrado["Título"])
     pregunta_vec = tfidf.transform([q])
-
-    # 7️⃣ Calcular similitudes
     similitudes = cosine_similarity(pregunta_vec, tfidf_matrix).flatten()
-    top_indices = similitudes.argsort()[-5:][::-1]  # top 5
-
+    top_indices = similitudes.argsort()[-5:][::-1]
     titulares_relevantes = df_filtrado.iloc[top_indices]
 
-    # 8️⃣ Construir prompt
-    prompt = "Con base en los siguientes titulares de noticias, responde la pregunta de forma contextual y sin inventar datos, la respuesta debe tener al menos 100 palabras, redactadas en párrafos completos y en tono profesional:\n\n"
+    prompt = "Con base en los siguientes titulares de noticias, responde la pregunta de forma contextual y sin inventar datos. Redacta en al menos 100 palabras, en tono profesional:\n\n"
     for _, row in titulares_relevantes.iterrows():
         prompt += f"- {row['Título']} ({row['Fuente']})\n"
     prompt += f"\nPregunta: {q}\nRespuesta:"
 
-    # 9️⃣ Llamada a OpenAI con la misma lógica de /resumen
     respuesta = client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Eres un asistente experto en análisis de noticias del ramo económico y comercial, con énfasis en aranceles, naves y parques industriales y FIBRAS."},
+            {"role": "system", "content": "Eres un analista experto en medios económicos y políticos."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.2,
@@ -703,20 +807,16 @@ def pregunta():
     )
     respuesta_gpt = respuesta.choices[0].message.content
 
-    # 🔟 Devolver respuesta y titulares
     titulares_info = [
-        {
-            "titulo": row["Título"],
-            "medio": row["Fuente"],
-            "enlace": row["Enlace"]
-        }
+        {"titulo": row["Título"], "medio": row["Fuente"], "enlace": row["Enlace"]}
         for _, row in titulares_relevantes.iterrows()
-    ][:5]  # máximo 5
+    ][:5]
 
     return jsonify({
         "respuesta": respuesta_gpt,
         "titulares_usados": titulares_info
     })
+
 
 #correoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 @app.route("/enviar_email", methods=["POST"])
