@@ -753,10 +753,38 @@ def pregunta():
                 return jsonify({"respuesta": f"No encontré datos de {columna_objetivo} para {fecha_dt}."})
 
             valor = df_dia[columna_objetivo].values[0]
+
+            # Aplicar formato según la columna
+            if columna_objetivo in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
+                try:
+                    valor = f"${float(valor):,.2f}"
+                except:
+                    valor = str(valor)
+
+            elif columna_objetivo in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
+                try:
+                    valor = formatear_porcentaje_decimal(float(valor))
+                except:
+                    valor = str(valor)
+
+            elif columna_objetivo == "SOFR":
+                valor = format_porcentaje_directo(valor)
+
+            elif columna_objetivo in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
+                valor = format_signed_pct(valor)
+
+            elif columna_objetivo in ["Inflación Anual MEX", "Inflación Subyacente MEX",
+                                    "Inflación Anual US", "Inflación Subyacente US"]:
+                try:
+                    valor = f"{float(valor)*100:.2f}%"
+                except:
+                    valor = str(valor)
+
             return jsonify({
                 "respuesta": f"El valor de {columna_objetivo} en {fecha_dt} fue {valor}.",
                 "columna": columna_objetivo
             })
+
 
     # ------------------------------
     # 2️⃣ Si no es indicador económico → lógica de noticias
