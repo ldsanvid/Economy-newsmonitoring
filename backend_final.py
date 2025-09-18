@@ -760,6 +760,10 @@ def pregunta():
                 promedio_fmt = formatear_porcentaje_decimal(promedio)
             elif columna_objetivo in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
                 promedio_fmt = format_signed_pct(promedio)
+            elif columna_objetivo in ["1M Treasury", "3M Treasury", "6M Treasury", "1Y Treasury",
+                                    "2Y Treasury", "3Y Treasury", "5Y Treasury", "7Y Treasury",
+                                    "10Y Treasury", "20Y Treasury", "30Y Treasury"]:
+                promedio_fmt = formatear_porcentaje_decimal(promedio)
             elif columna_objetivo in ["Inflación Anual MEX", "Inflación Subyacente MEX"]:
                 valores_previos = df_infl_mx[df_infl_mx["Fecha"] <= fecha_fin][columna_objetivo].dropna()
                 if not valores_previos.empty:
@@ -774,6 +778,11 @@ def pregunta():
                     ultimo_valor = valores_previos.iloc[-1]
                     promedio_fmt = f"{ultimo_valor*100:.2f}%"
                 else:
+                    promedio_fmt = "N/D"
+            else:
+                try:
+                    promedio_fmt = formatear_porcentaje_decimal(float(promedio))
+                except:
                     promedio_fmt = "N/D"
 
             return jsonify({
