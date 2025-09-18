@@ -119,7 +119,7 @@ for df_tmp in [df_tipo_cambio, df_tasas, df_sofr, df_wall, df_infl_us, df_infl_m
 
 # Unir con df_economia
 df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
-df_economia = df_economia.merge(df_sofr[["Fecha", "SOFR"]], on="Fecha", how="left")
+df_economia = df_economia.merge(df_sofr, on="Fecha", how="left")
 df_economia = df_economia.merge(
     df_infl_us[["Fecha", "Inflación Anual US", "Inflación Subyacente US"]],
     on="Fecha", how="left"
@@ -732,59 +732,91 @@ def pregunta():
         if not (fecha_inicio and fecha_fin):
             fecha_inicio, fecha_fin = extraer_fechas(q)
 
+        # ------------------------------
+        # Caso PROMEDIO en rango
+        # ------------------------------
         if fecha_inicio and fecha_fin and fecha_inicio != fecha_fin:
-            # Promedio en rango
             df_rango = df_economia[(df_economia["Fecha"] >= fecha_inicio) & (df_economia["Fecha"] <= fecha_fin)]
-            if df_rango.empty:
+            if df_rango.empty or columna_objetivo not in df_rango.columns:
                 return jsonify({"respuesta": f"No encontré datos de {columna_objetivo} entre {fecha_inicio} y {fecha_fin}."})
-            promedio = pd.to_numeric(df_rango[columna_objetivo], errors="coerce").mean()
+
+            serie = pd.to_numeric(df_rango[columna_objetivo], errors="coerce").dropna()
+            if serie.empty:
+                return jsonify({"respuesta": f"No encontré datos de {columna_objetivo} entre {fecha_inicio} y {fecha_fin}."})
+            promedio = serie.mean()
+
+            # Aplicar formato según el indicador
+            if columna_objetivo in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
+                promedio_fmt = f"${promedio:,.2f}"
+            elif columna_objetivo in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
+                promedio_fmt = formatear_porcentaje_decimal(promedio)
+            elif columna_objetivo == "SOFR":
+                promedio_fmt = formatear_porcentaje_decimal(promedio)
+            elif columna_objetivo in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
+                promedio_fmt = format_signed_pct(promedio)
+            elif columna_objetivo in ["Inflación Anual MEX", "Inflación Subyacente MEX"]:
+                valores_previos = df_infl_mx[df_infl_mx["Fecha"] <= fecha_fin][columna_objetivo].dropna()
+                if not valores_previos.empty:
+                    ultimo_valor = valores_previos.iloc[-1]
+                    promedio_fmt = f"{ultimo_valor*100:.2f}%"
+                else:
+                    promedio_fmt = "N/D"
+
+            elif columna_objetivo in ["Inflación Anual US", "Inflación Subyacente US"]:
+                valores_previos = df_infl_us[df_infl_us["Fecha"] <= fecha_fin][columna_objetivo].dropna()
+                if not valores_previos.empty:
+                    ultimo_valor = valores_previos.iloc[-1]
+                    promedio_fmt = f"{ultimo_valor*100:.2f}%"
+                else:
+                    promedio_fmt = "N/D"
+
             return jsonify({
-                "respuesta": f"El promedio de {columna_objetivo} entre {fecha_inicio} y {fecha_fin} fue {promedio:.2f}.",
+                "respuesta": f"El promedio de {columna_objetivo} entre {fecha_inicio} y {fecha_fin} fue {promedio_fmt}.",
                 "columna": columna_objetivo
             })
+
+        # ------------------------------
+        # Caso VALOR puntual
+        # ------------------------------
         else:
-            # Valor puntual
             fecha_dt = fecha_fin or obtener_fecha_mas_reciente(df_economia)
             df_dia = df_economia[df_economia["Fecha"] == fecha_dt]
             if df_dia.empty:
                 ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
                 df_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
-            if df_dia.empty:
+            if df_dia.empty or columna_objetivo not in df_dia.columns:
                 return jsonify({"respuesta": f"No encontré datos de {columna_objetivo} para {fecha_dt}."})
 
             valor = df_dia[columna_objetivo].values[0]
 
             # Aplicar formato según la columna
             if columna_objetivo in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
-                try:
-                    valor = f"${float(valor):,.2f}"
-                except:
-                    valor = str(valor)
-
+                valor_fmt = f"${float(valor):,.2f}"
             elif columna_objetivo in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
-                try:
-                    valor = formatear_porcentaje_decimal(float(valor))
-                except:
-                    valor = str(valor)
-
+                valor_fmt = formatear_porcentaje_decimal(float(valor))
             elif columna_objetivo == "SOFR":
-                valor = format_porcentaje_directo(valor)
-
+                valor_fmt = formatear_porcentaje_decimal(float(valor))
             elif columna_objetivo in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
-                valor = format_signed_pct(valor)
-
-            elif columna_objetivo in ["Inflación Anual MEX", "Inflación Subyacente MEX",
-                                    "Inflación Anual US", "Inflación Subyacente US"]:
-                try:
-                    valor = f"{float(valor)*100:.2f}%"
-                except:
-                    valor = str(valor)
+                valor_fmt = format_signed_pct(valor)
+            elif columna_objetivo in ["Inflación Anual MEX", "Inflación Subyacente MEX"]:
+                valores_previos = df_infl_mx[df_infl_mx["Fecha"] <= fecha_dt][columna_objetivo].dropna()
+                if not valores_previos.empty:
+                    ultimo_valor = valores_previos.iloc[-1]
+                    valor_fmt = f"{ultimo_valor*100:.2f}%"
+                else:
+                    valor_fmt = "N/D"
+            elif columna_objetivo in ["Inflación Anual US", "Inflación Subyacente US"]:
+                valores_previos = df_infl_us[df_infl_us["Fecha"] <= fecha_dt][columna_objetivo].dropna()
+                if not valores_previos.empty:
+                    ultimo_valor = valores_previos.iloc[-1]
+                    valor_fmt = f"{ultimo_valor*100:.2f}%"
+                else:
+                    valor_fmt = "N/D"
 
             return jsonify({
-                "respuesta": f"El valor de {columna_objetivo} en {fecha_dt} fue {valor}.",
+                "respuesta": f"El valor de {columna_objetivo} en {fecha_dt} fue {valor_fmt}.",
                 "columna": columna_objetivo
             })
-
 
     # ------------------------------
     # 2️⃣ Si no es indicador económico → lógica de noticias
@@ -844,6 +876,7 @@ def pregunta():
         "respuesta": respuesta_gpt,
         "titulares_usados": titulares_info
     })
+
 
 
 #correoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
