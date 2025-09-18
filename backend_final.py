@@ -804,6 +804,11 @@ def pregunta():
                 valor_fmt = formatear_porcentaje_decimal(float(valor))
             elif columna_objetivo in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
                 valor_fmt = format_signed_pct(valor)
+            elif columna_objetivo in ["1M Treasury", "3M Treasury", "6M Treasury", "1Y Treasury",
+                          "2Y Treasury", "3Y Treasury", "5Y Treasury", "7Y Treasury",
+                          "10Y Treasury", "20Y Treasury", "30Y Treasury"]:
+                valor_fmt = formatear_porcentaje_decimal(float(valor))
+    
             elif columna_objetivo in ["Inflación Anual MEX", "Inflación Subyacente MEX"]:
                 valores_previos = df_infl_mx[df_infl_mx["Fecha"] <= fecha_dt][columna_objetivo].dropna()
                 if not valores_previos.empty:
@@ -819,17 +824,13 @@ def pregunta():
                 else:
                     valor_fmt = "N/D"
 
+            else:
+                valor_fmt = str(valor) if valor is not None else "N/D"
+
             return jsonify({
                 "respuesta": f"El valor de {columna_objetivo} en {fecha_dt} fue {valor_fmt}.",
                 "columna": columna_objetivo
             })
-    else:
-        # Caso por defecto: Treasuries y otros
-        try:
-            valor_fmt = formatear_porcentaje_decimal(float(valor))
-        except:
-            valor_fmt = str(valor)
-
     # ------------------------------
     # 2️⃣ Si no es indicador económico → lógica de noticias
     # ------------------------------
