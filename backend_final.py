@@ -765,12 +765,19 @@ def pregunta():
                                     "10Y Treasury", "20Y Treasury", "30Y Treasury"]:
                 promedio_fmt = formatear_porcentaje_decimal(promedio)
             elif columna_objetivo in ["Inflación Anual MEX", "Inflación Subyacente MEX"]:
-                valores_previos = df_infl_mx[df_infl_mx["Fecha"] <= fecha_fin][columna_objetivo].dropna()
+                # Filtrar solo datos del mismo mes y año que la fecha pedida
+                valores_previos = df_infl_mx[
+                    (df_infl_mx["Fecha"].dt.month == fecha_dt.month) &
+                    (df_infl_mx["Fecha"].dt.year == fecha_dt.year)
+                ][columna_objetivo].dropna()
+                
                 if not valores_previos.empty:
+                    # tomar el último valor de ese mes
                     ultimo_valor = valores_previos.iloc[-1]
-                    promedio_fmt = f"{ultimo_valor*100:.2f}%"
+                    valor_fmt = f"{ultimo_valor*100:.2f}%"
                 else:
-                    promedio_fmt = "N/D"
+                    valor_fmt = f"No encontré datos de {columna_objetivo} en {fecha_dt.strftime('%B %Y')}"
+
 
             elif columna_objetivo in ["Inflación Anual US", "Inflación Subyacente US"]:
                 valores_previos = df_infl_us[df_infl_us["Fecha"] <= fecha_fin][columna_objetivo].dropna()
@@ -826,15 +833,18 @@ def pregunta():
                 else:
                     valor_fmt = "N/D"
             elif columna_objetivo in ["Inflación Anual US", "Inflación Subyacente US"]:
-                valores_previos = df_infl_us[df_infl_us["Fecha"] <= fecha_dt][columna_objetivo].dropna()
+                # Si la pregunta menciona un mes, toma todos los valores de ese mes
+                valores_previos = df_infl_us[
+                    (df_infl_us["Fecha"].dt.month == fecha_dt.month) &
+                    (df_infl_us["Fecha"].dt.year == fecha_dt.year)
+                ][columna_objetivo].dropna()
+                
                 if not valores_previos.empty:
+                    # último valor del mes
                     ultimo_valor = valores_previos.iloc[-1]
                     valor_fmt = f"{ultimo_valor*100:.2f}%"
                 else:
-                    valor_fmt = "N/D"
-
-            else:
-                valor_fmt = str(valor) if valor is not None else "N/D"
+                    valor_fmt = f"No encontré datos de {columna_objetivo} en {fecha_dt.strftime('%B %Y')}"
 
             return jsonify({
                 "respuesta": f"El valor de {columna_objetivo} en {fecha_dt} fue {valor_fmt}.",
