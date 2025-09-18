@@ -284,7 +284,13 @@ def extraer_fechas(pregunta):
 
 # 2️⃣ Obtener fecha más reciente disponible
 def obtener_fecha_mas_reciente(df):
-    return df["Fecha"].max().date()
+    fecha_max = df["Fecha"].max()
+    # Si es pandas Timestamp (tiene método .date), conviértelo
+    if hasattr(fecha_max, "date"):
+        return fecha_max.date()
+    # Si ya es datetime.date, devuélvelo directo
+    return fecha_max
+
 
 # 3️⃣ Detectar sentimiento deseado
 def detectar_sentimiento_deseado(pregunta):
@@ -817,6 +823,12 @@ def pregunta():
                 "respuesta": f"El valor de {columna_objetivo} en {fecha_dt} fue {valor_fmt}.",
                 "columna": columna_objetivo
             })
+    else:
+        # Caso por defecto: Treasuries y otros
+        try:
+            valor_fmt = formatear_porcentaje_decimal(float(valor))
+        except:
+            valor_fmt = str(valor)
 
     # ------------------------------
     # 2️⃣ Si no es indicador económico → lógica de noticias
