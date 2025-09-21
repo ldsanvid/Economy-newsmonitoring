@@ -839,7 +839,7 @@ def pregunta():
             # Aplicar formato según la columna
             if columna_objetivo in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
                 valor_fmt = f"${float(valor):,.2f}"
-            elif columna_objetivo in ["Tasa de Interés Objetivo Banxico", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
+            elif columna_objetivo in ["Tasa de Interés Objetivo Banxico", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días","Tasa efectiva FED", "Rango objetivo superior FED", "Rango objetivo inferior FED"]:
                 valor_fmt = formatear_porcentaje_decimal(float(valor))
             elif columna_objetivo == "SOFR":
                 valor_fmt = formatear_porcentaje_decimal(float(valor))
