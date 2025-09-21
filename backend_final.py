@@ -97,7 +97,7 @@ ORDEN_COLUMNAS = [
 # Indicadores económicos
 df_tipo_cambio = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tipo de Cambio")
 df_tasas = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tasas de interés")
-df_tasas_us = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tasas de Interés US")
+df_tasas_us = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tasas de interés US")
 df_economia = df_tipo_cambio.merge(df_tasas, on=["Año", "Fecha"], how="outer")
 df_economia = df_economia.merge(df_tasas_us, on=["Año", "Fecha"], how="outer").fillna("")
 # Cargar hojas adicionales
