@@ -969,7 +969,7 @@ def enviar_email():
 
         # 🔹 Tasas
         for col in ["Tasa de Interés Objetivo Banxico", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
-                    "Tasa efectiva FED", "Rango objetivo superior Fed", "Rango objetivo inferior Fed"]:
+                    "Tasa efectiva FED", "Rango objetivo superior FED", "Rango objetivo inferior FED"]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
                 economia_dia[col] = economia_dia[col].apply(formatear_porcentaje_decimal)
