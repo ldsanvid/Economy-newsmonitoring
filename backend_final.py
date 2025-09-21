@@ -97,7 +97,9 @@ ORDEN_COLUMNAS = [
 # Indicadores económicos
 df_tipo_cambio = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tipo de Cambio")
 df_tasas = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tasas de interés")
-df_economia = pd.merge(df_tipo_cambio, df_tasas, on=["Año", "Fecha"], how="outer").fillna("")
+df_tasas_us = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tasas de Interés US")
+df_economia = df_tipo_cambio.merge(df_tasas, on=["Año", "Fecha"], how="outer")
+df_economia = df_economia.merge(df_tasas_us, on=["Año", "Fecha"], how="outer").fillna("")
 # Cargar hojas adicionales
 df_sofr = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Treasuries_SOFR")
 df_wall = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Wallstreet")
@@ -569,7 +571,8 @@ Noticias no relacionadas con aranceles:
                 economia_dia[col] = economia_dia[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
 
         # 🔹 Tasas
-        for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
+        for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
+                    "Tasa efectiva FED", "Rango objetivo superior FED", "Rango objetivo inferior FED"]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
                 economia_dia[col] = economia_dia[col].apply(formatear_porcentaje_decimal)
@@ -605,6 +608,7 @@ Noticias no relacionadas con aranceles:
         orden_columnas = [
             "Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo",
             "Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
+            "Tasa efectiva FED", "Rango objetivo superior FED", "Rango objetivo inferior FED"
             "SOFR", "% Dow Jones", "% S&P500", "% Nasdaq",
             "Inflación Anual MEX", "Inflación Subyacente MEX",
             "Inflación Anual US", "Inflación Subyacente US"
@@ -958,7 +962,8 @@ def enviar_email():
                 economia_dia[col] = economia_dia[col].apply(formatear_porcentaje)
 
         # 🔹 Tasas
-        for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"]:
+        for col in ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
+                    "Tasa efectiva FED", "Rango objetivo superior Fed", "Rango objetivo inferior Fed"]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
                 economia_dia[col] = economia_dia[col].apply(formatear_porcentaje_decimal)
@@ -1000,6 +1005,7 @@ def enviar_email():
         filas = [
             ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"],
             ["Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días"],
+            ["Tasa efectiva FED", "Rango objetivo superior FED", "Rango objetivo inferior FED"],
             ["SOFR", "% Dow Jones", "% S&P500", "% Nasdaq"],
             ["Inflación Anual MEX", "Inflación Subyacente MEX",
              "Inflación Anual US", "Inflación Subyacente US"]
