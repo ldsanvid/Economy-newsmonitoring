@@ -85,6 +85,9 @@ ORDEN_COLUMNAS = [
             "TIIE 28 días",
             "TIIE 91 días",
             "TIIE 182 días",
+            "Tasa efectiva FED",
+            "Rango objetivo superior FED",
+            "Rango objetivo inferior FED",
             "SOFR",
             "% Dow Jones",
             "% S&P500",
@@ -413,11 +416,11 @@ def seleccionar_titulares_relevantes(titulares, pregunta):
 # 7️⃣ Nube de palabras con colores y stopwords personalizadas
 def color_func(word, font_size, position, orientation, random_state=None, **kwargs):
     if font_size >= 60:
-        return "rgb(0, 0, 0)"
+        return "rgb(61, 183, 162)"
     elif font_size >= 40:
-        return "rgb(255, 180, 41)"
+        return "rgb(253, 181, 93)"
     else:
-        return "rgb(125, 123, 120)"
+        return "rgb(11, 53, 71)"
 
 def generar_nube(titulos, archivo_salida):
     texto = " ".join(titulos)
