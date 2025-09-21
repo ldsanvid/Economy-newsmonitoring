@@ -225,6 +225,21 @@ mapa_indices = {
     "nasdaq": "% Nasdaq"
 }
 
+#Tasas de interés US
+mapa_tasas_us = {
+    "tasa de interés de Estados Unidos": "Rango objetivo superior FED",
+    "tasa de interés de la fed": "Rango objetivo superior FED",
+    "tasa de interés US": "Rango objetivo superior FED",
+    "rango superior de tasas de interés de la Fed": "Rango objetivo superior FED",
+    "rango inferior de tasas de interés de la Fed": "Rango objetivo inferior FED",
+    "rango máximo de tasas de interés de la Fed": "Rango objetivo superior FED",
+    "rango mínimo de tasas de interés de la Fed": "Rango objetivo inferior FED",
+    "effective federal funds rate": "Tasa efectiva FED",
+    "tasa efectiva de la Fed": "Tasa efectiva FED",
+    "tasa de fondos federales de la Fed": "Tasa efectiva FED",
+    "effr":"Tasa efectiva FED"
+} 
+
 # ------------------------------
 # 📜 Contexto político único
 # ------------------------------
@@ -733,8 +748,8 @@ def pregunta():
     # ------------------------------
     # 1️⃣ Detectar si la pregunta es sobre indicadores económicos
     # ------------------------------
-    mapa_general = {**mapa_tipo_cambio, **mapa_tasas, **mapa_inflacion,
-                    **mapa_treasuries, **mapa_indices}
+    mapa_general = {**mapa_tipo_cambio, **mapa_tasas, **mapa_tasas_us,
+                    **mapa_inflacion, **mapa_treasuries, **mapa_indices}
 
     columna_objetivo = None
     for key, col in mapa_general.items():
