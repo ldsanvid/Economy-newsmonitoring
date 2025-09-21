@@ -608,7 +608,7 @@ Noticias no relacionadas con aranceles:
         orden_columnas = [
             "Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo",
             "Tasa de Interés Objetivo", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
-            "Tasa efectiva FED", "Rango objetivo superior FED", "Rango objetivo inferior FED"
+            "Tasa efectiva FED", "Rango objetivo superior FED", "Rango objetivo inferior FED",
             "SOFR", "% Dow Jones", "% S&P500", "% Nasdaq",
             "Inflación Anual MEX", "Inflación Subyacente MEX",
             "Inflación Anual US", "Inflación Subyacente US"
