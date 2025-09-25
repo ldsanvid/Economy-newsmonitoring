@@ -274,7 +274,12 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - Luiz Inacio Lula Da Silva es el actual Presidente de Brasil. Jair Bolsonaro es elexpresidente de Brasil.
 - Christine Lagarde es la actual Presidenta del Banco Central Europeo.
 - GOP es el Partido Republicano estadounidense.
-- Verónica Delgadillo es la actual Alcaldesa de Guadalajara 
+- Verónica Delgadillo es la actual Alcaldesa de Guadalajara.
+- El T-MEC o TMEC es el Tratado de Libre Comercio entre México, Estados Unidos y Canadá. Se le conoce también como USMCA por sus siglas en inglés.
+- Michelle Bowman es la Vicepresidenta de Supervisión de la Junta de Gobernadores del Sistema de la Reserva Federal.
+- Austan Goolsbee es el Presidente del Banco de la Reserva Federal de Chicago.
+- La OCDE (OECD por sus siglas en inglés) es la Organización para la Cooperación y el Desarrollo Económico . 
+- El ECB es el European Central Bank o Banco Europeo Central.
 """
 
 def extraer_fechas(pregunta):
@@ -346,8 +351,7 @@ def extraer_entidades(texto):
         "Milei": ["presidente de argentina"],
         "Von Der Leyen": ["presidenta de la comisión europea"],
         "Petro": ["presidente de colombia"],
-        "Fed": ["Federal Reserve"]
-
+        "Fed": ["Federal Reserve"],
     }
     lugares_dict = {
         "Nuevo León": ["nl", "monterrey"],
