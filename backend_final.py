@@ -280,6 +280,7 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - Austan Goolsbee es el Presidente del Banco de la Reserva Federal de Chicago.
 - La OCDE (OECD por sus siglas en inglés) es la Organización para la Cooperación y el Desarrollo Económico . 
 - El ECB es el European Central Bank o Banco Europeo Central.
+- Cuando una noticia viene en inglés y hablan de "EU", se refierne a la Unión Europea.
 """
 
 def extraer_fechas(pregunta):
