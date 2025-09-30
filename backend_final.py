@@ -527,15 +527,15 @@ def generar_resumen_y_datos(fecha_str):
     prompt = f"""
     {CONTEXTO_POLITICO}
 
-Redacta un resumen de noticias del {fecha_str} dividido en cuatro párrafos. Tono profesional, objetivo y dirigido a tomadores de decisiones. Máximo 250 palabras.
+Redacta un resumen de noticias del {fecha_str} dividido en cinco párrafos. Tono profesional, objetivo y dirigido a tomadores de decisiones. De 400 palabras.
 
-Primer párrafo: Describe y contextualiza el tema más repetido del día (qué, quién, cómo).
+Primer párrafo: Describe y contextualiza el tema más repetido del día (qué, quién, cómo). Sin dar tu punto de vista, quiero que presentes todo lo que encontraste sobre ese tema (declaraciones de diversos actores u organismos, por ejemplo, para mostrar todas las versiones).
 
-Segundo párrafo: Si el tema más repetido del día es de noticias nacionales, usa este segundo párrafo para profundizar en el segundo tema más importante que sea de noticias internacionales. Si en cambio el tema más repetido del día no es de noticias nacionales, este segundo párrafo debe enfocarse en el tema más relevante de noticias nacionales.
+Segundo párrafo: Sin repetir la noticia sobre la que te enfocaste en el primer párrafo, en este párrafo quiero que resumas las noticias, tanto de cobertura nacional como internacional, que sean sobre aranceles, tasas de interés, acuerdo comercial, banco central y reserva federal. Permítete hacer este párrafo más extenso que el resto si es necesario.
 
-Tercer párrafo: Resume brevemente las noticias que son de cobertura de algún estado de México (locales), excluyendo aquellas de cobertura nacional o internacional. Menciona el estado o ciudad de cobertura de cada noticia. No repitas noticias mencionadas en los párrafos anteriores ni inventes cosas. Reserva todo lo relativo a fibras, naves industriales, parques industriales, hub logístico, hub industrial, real estate industrial, sector industrial o sector mobiliario industrial.
+Tercer párrafo: Resume brevemente las noticias que son de cobertura de algún estado de México (locales), excluyendo aquellas de cobertura nacional o internacional SIN REPETIR NOTICIAS DE LOS PÁRRAFOS PREVIOS. Menciona el estado o ciudad de cobertura de cada noticia. No repitas noticias mencionadas en los párrafos anteriores ni inventes cosas. Reserva todo lo relativo a fibras, naves industriales, parques industriales, hub logístico, hub industrial, real estate industrial, sector industrial o sector mobiliario industrial para el último párrafo. Usa este párrafo para cubrir noticias relacionadas con industria automotriz, transporte, construcción, fusiones y cadenas de suministro.
 
-Cuarto párrafo: Por último, resume de forma general las noticias que no están relacionadas con aranceles y que tienen que ver con fibras, naves industriales, parques industriales, hub logístico, hub industrial, real estate industrial, sector industrial o sector mobiliario industrial SIN REPETIR ALGUNA NOTICIAS MENCIONADA EN PÁRRAFOS PREVIOS. Evita repetir noticias mencionadas en los otros párrafos ni inventes cosas. Recuerda, temas no arancelarios. Empieza diciendo "finalmente en otros temas económicos", sin recalcar de que se trata de noticias del ámbito local o nacional..
+Cuarto párrafo: Por último, resume de forma general las noticias que tienen que ver con fibras, naves industriales, parques industriales, hub logístico, hub industrial, real estate industrial, sector industrial o sector mobiliario industrial SIN REPETIR ALGUNA NOTICIAS MENCIONADA EN PÁRRAFOS PREVIOS. Recuerda, temas no arancelarios. Empieza diciendo "finalmente en otros temas económicos", sin recalcar de que se trata de noticias del ámbito local o nacional.
 
 Noticias nacionales:
 {contexto_nacional}
