@@ -100,6 +100,11 @@
         justify-content: center;
       }
 
+        .tableauPlaceholder {
+        min-height: 400px;
+      }
+
+
       nav a {
         font-size: 0.85rem;   /* Texto un poco más chico */
         padding: 6px 8px;
@@ -254,6 +259,7 @@
         <script type='text/javascript'>
           var divElement = document.getElementById('vizNoticias');
           var vizElement = divElement.getElementsByTagName('object')[0];
+          var ancho = divElement.offsetWidth || window.innerWidth;
           vizElement.style.width = '100%';
           vizElement.style.height = (divElement.offsetWidth * 0.75) + 'px';
           var scriptElement = document.createElement('script');
@@ -292,6 +298,7 @@
         <script type='text/javascript'>
           var divElement = document.getElementById('vizIndicadores');
           var vizElement = divElement.getElementsByTagName('object')[0];
+          var ancho = divElement.offsetWidth || window.innerWidth;
           vizElement.style.width = '100%';
           vizElement.style.height = (divElement.offsetWidth * 0.75) + 'px';
           var scriptElement = document.createElement('script');
