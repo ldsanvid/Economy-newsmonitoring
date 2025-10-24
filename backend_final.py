@@ -26,6 +26,14 @@ import requests
 import calendar
 from babel.dates import format_date
 
+import faiss
+import numpy as np
+
+index = faiss.read_index("faiss_index/noticias_index.faiss")
+embeddings = np.load("faiss_index/noticias_embeddings.npy")
+df_metadata = pd.read_csv("faiss_index/noticias_metadata.csv")
+
+
 def nombre_mes(fecha):
     """Devuelve la fecha con mes en español, ej: 'agosto 2025'"""
     return format_date(fecha, "LLLL yyyy", locale="es").capitalize()
