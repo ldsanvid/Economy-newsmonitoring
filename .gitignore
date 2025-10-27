@@ -1,7 +1,18 @@
+# Archivos y carpetas a ignorar
 .env
 __pycache__/
 *.pyc
+
+# ✅ Incluir el índice FAISS
 !faiss_index/
 !faiss_index/*.faiss
 !faiss_index/*.npy
 !faiss_index/*.csv
+
+# ✅ Incluir reportes PDF
+!reporte_semanal/
+!reporte_semanal/*.pdf
+
+# ✅ Incluir base de datos y archivo de tasas
+!noticias_fondo con todas las fuentes_rango_03-07-2025.csv
+!tipo de cambio y tasas de interés.xlsx
