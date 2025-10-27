@@ -5,10 +5,11 @@ requests
 matplotlib
 wordcloud
 Pillow
-numpy
+numpy==1.26.4
 openpyxl
 scikit-learn
 dateparser
 flask_cors
 Babel
+faiss-cpu==1.7.4
 gunicorn

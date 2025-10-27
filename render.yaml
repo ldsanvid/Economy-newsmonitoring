@@ -1,0 +1,5 @@
+services:
+  - type: web
+    name: monitoreo-backend
+    env: docker
+    plan: free

@@ -53,10 +53,26 @@ def update_embeddings(csv_path="noticias_fondo con todas las fuentes_rango_03-07
     faiss.write_index(index, index_path)
     np.save(emb_path, updated_emb)
 
-    # Unir metadatos
-    df_final = pd.concat([df_new], ignore_index=True)
+    # --- Unir y normalizar metadatos ---
+    df_final = df_new.copy()
+
+    # 1️⃣ Crear ID incremental único
+    df_final.insert(0, "id", range(len(df_final)))
+
+    # 2️⃣ Asegurar columnas requeridas (crearlas si no existen)
+    requeridas = ["id","Fecha","Título","Fuente","Enlace","Cobertura","Término","Sentimiento"]
+    for col in requeridas:
+        if col not in df_final.columns:
+            df_final[col] = ""
+
+    # 3️⃣ Normalizar formato de fecha a ISO
+    df_final["Fecha"] = pd.to_datetime(df_final["Fecha"], errors="coerce", dayfirst=True).dt.strftime("%Y-%m-%d")
+
+    # 4️⃣ Guardar CSV final en UTF-8 con BOM
     df_final.to_csv(meta_path, index=False, encoding="utf-8-sig")
 
+    print(f"✅ CSV actualizado y guardado en {meta_path} con {len(df_final)} registros.")
+    print(f"📄 Columnas finales: {list(df_final.columns)}")
     print("✅ Embeddings actualizados y guardados.")
 
 if __name__ == "__main__":
