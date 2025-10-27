@@ -10,7 +10,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 import dateparser
 import csv
 from wordcloud import WordCloud
-from collections import OrderedDict
 from flask import send_file
 from collections import OrderedDict
 import smtplib
@@ -25,14 +24,6 @@ import base64
 import requests
 import calendar
 from babel.dates import format_date
-
-import faiss
-import numpy as np
-
-index = faiss.read_index("faiss_index/noticias_index.faiss")
-embeddings = np.load("faiss_index/noticias_embeddings.npy")
-df_metadata = pd.read_csv("faiss_index/noticias_metadata.csv")
-
 
 def nombre_mes(fecha):
     """Devuelve la fecha con mes en español, ej: 'agosto 2025'"""
@@ -124,6 +115,40 @@ df_infl_mx = df_infl_mx.rename(columns={
     "Inflación Anual": "Inflación Anual MEX",
     "Inflación Subyacente": "Inflación Subyacente MEX"
 })
+# ------------------------------
+# 🧠 Carga del índice FAISS (para búsqueda semántica) — con rutas absolutas y diagnóstico
+# ------------------------------
+import faiss
+
+USE_FAISS = True
+try:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    faiss_dir = os.path.join(base_dir, "faiss_index")
+
+    index_path = os.path.join(faiss_dir, "noticias_index.faiss")
+    meta_path = os.path.join(faiss_dir, "noticias_metadata.csv")
+
+    # 🔍 Verifica existencia antes de cargar
+    if not os.path.exists(index_path):
+        raise FileNotFoundError(f"No se encontró el archivo FAISS: {index_path}")
+    if not os.path.exists(meta_path):
+        raise FileNotFoundError(f"No se encontró el archivo de metadatos: {meta_path}")
+
+    index = faiss.read_index(index_path)
+    df_metadata = pd.read_csv(meta_path)
+
+    # Validar columnas necesarias
+    columnas_requeridas = ["id","Fecha","Título","Fuente","Enlace","Cobertura","Término","Sentimiento"]
+    if not all(col in df_metadata.columns for col in columnas_requeridas):
+        raise ValueError("❌ El CSV de metadatos FAISS no contiene todas las columnas requeridas.")
+
+    print(f"✅ FAISS cargado correctamente con {len(df_metadata)} registros.")
+    print(f"📂 Ruta del índice: {index_path}")
+
+except Exception as e:
+    USE_FAISS = False
+    print(f"⚠️ No se pudo cargar FAISS, se usará TF-IDF. Motivo: {e}")
+
 
 # 🔄 Normalizar fechas para que todas las hojas tengan el mismo formato date
 for df_tmp in [df_tipo_cambio, df_tasas, df_sofr, df_wall, df_infl_us, df_infl_mx]:
@@ -431,6 +456,61 @@ def filtrar_titulares(df_filtrado, entidades, sentimiento_deseado):
         filtro = filtro[filtro["Sentimiento"] == sentimiento_deseado]
 
     return filtro
+
+# ------------------------------
+# 🔍 Búsqueda semántica con FAISS o TF-IDF (según disponibilidad)
+# ------------------------------
+def buscar_semantica_noticias(query, df_base, top_k=200):
+    """
+    Si hay FAISS: busca en TODO el corpus y luego intersecta con df_base (filtros de fecha/entidades/sentimiento).
+    Si no hay FAISS: hace TF-IDF sobre df_base.
+    Devuelve un DataFrame con las top coincidencias (máx 5).
+    """
+    q = query.strip()
+    if not USE_FAISS:
+        tfidf = TfidfVectorizer()
+        X = tfidf.fit_transform(df_base["Título"])
+        v = tfidf.transform([q])
+        sims = cosine_similarity(v, X).flatten()
+        idx = sims.argsort()[-5:][::-1]
+        return df_base.iloc[idx]
+
+    try:
+        emb_q = client.embeddings.create(
+            model="text-embedding-3-small", input=q
+        ).data[0].embedding
+
+        vq = np.array(emb_q, dtype="float32")[np.newaxis, :]
+        sims, ids = index.search(vq, top_k)
+        candidatos = df_metadata.iloc[ids[0]].copy()
+
+        # Intersección con df_base por campos clave
+        clave = ["Título","Fuente","Enlace"]
+        mergeado = candidatos.merge(
+            df_base[clave + ["Fecha","Cobertura","Término","Sentimiento"]],
+            on=clave, how="inner"
+        )
+
+        if mergeado.empty:
+            tfidf = TfidfVectorizer()
+            X = tfidf.fit_transform(df_base["Título"])
+            v = tfidf.transform([q])
+            sims = cosine_similarity(v, X).flatten()
+            idx = sims.argsort()[-5:][::-1]
+            return df_base.iloc[idx]
+
+        orden = {t:i for i,t in enumerate(candidatos["Título"].tolist())}
+        mergeado["__rank"] = mergeado["Título"].map(orden)
+        mergeado = mergeado.sort_values("__rank").drop(columns="__rank")
+        return mergeado.head(5)
+
+    except Exception:
+        tfidf = TfidfVectorizer()
+        X = tfidf.fit_transform(df_base["Título"])
+        v = tfidf.transform([q])
+        sims = cosine_similarity(v, X).flatten()
+        idx = sims.argsort()[-5:][::-1]
+        return df_base.iloc[idx]
 
 
 
@@ -749,203 +829,83 @@ def extraer_rango_fechas(pregunta):
     return None, None
 
 #pregunta!!!!    
+# ------------------------------
+# 🤖 Endpoint /pregunta (ahora con RAG real + FAISS)
+# ------------------------------
 @app.route("/pregunta", methods=["POST"])
 def pregunta():
     data = request.get_json()
     q = data.get("pregunta", "")
     if not q:
-        return jsonify({"respuesta": "No se proporcionó una pregunta."})
+        return jsonify({"respuesta": "No se proporcionó una pregunta."}), 400
 
-    q_lower = q.lower().strip()
-
-    # ------------------------------
-    # 1️⃣ Detectar si la pregunta es sobre indicadores económicos
-    # ------------------------------
-    mapa_general = {**mapa_tipo_cambio, **mapa_tasas, **mapa_tasas_us,
-                    **mapa_inflacion, **mapa_treasuries, **mapa_indices}
-
-    columna_objetivo = None
-    for key, col in mapa_general.items():
-        if key in q_lower:
-            columna_objetivo = col
-            break
-
-    if columna_objetivo:
-        # 2️⃣ Detectar fecha o rango
-        fecha_inicio, fecha_fin = extraer_rango_fechas(q)
-        if not (fecha_inicio and fecha_fin):
-            fecha_inicio, fecha_fin = extraer_fechas(q)
-
-        # ------------------------------
-        # Caso PROMEDIO en rango
-        # ------------------------------
-        if fecha_inicio and fecha_fin and fecha_inicio != fecha_fin:
-            df_rango = df_economia[(df_economia["Fecha"] >= fecha_inicio) & (df_economia["Fecha"] <= fecha_fin)]
-            if df_rango.empty or columna_objetivo not in df_rango.columns:
-                return jsonify({"respuesta": f"No encontré datos de {columna_objetivo} entre {fecha_inicio} y {fecha_fin}."})
-
-            serie = pd.to_numeric(df_rango[columna_objetivo], errors="coerce").dropna()
-            if serie.empty:
-                return jsonify({"respuesta": f"No encontré datos de {columna_objetivo} entre {fecha_inicio} y {fecha_fin}."})
-            promedio = serie.mean()
-
-            # Aplicar formato según el indicador
-            if columna_objetivo in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
-                promedio_fmt = f"${promedio:,.2f}"
-            elif columna_objetivo in ["Tasa de Interés Objetivo Banxico", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días", "Tasa efectiva FED", "Rango objetivo superior FED", "Rango objetivo inferior FED"]:
-                promedio_fmt = formatear_porcentaje_decimal(promedio)
-            elif columna_objetivo == "SOFR":
-                promedio_fmt = formatear_porcentaje_decimal(promedio)
-            elif columna_objetivo in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
-                promedio_fmt = format_signed_pct(promedio)
-            elif columna_objetivo in ["1M Treasury", "3M Treasury", "6M Treasury", "1Y Treasury",
-                                    "2Y Treasury", "3Y Treasury", "5Y Treasury", "7Y Treasury",
-                                    "10Y Treasury", "20Y Treasury", "30Y Treasury"]:
-                promedio_fmt = formatear_porcentaje_decimal(promedio)
-            elif columna_objetivo in ["Inflación Anual MEX", "Inflación Subyacente MEX"]:
-                # Filtrar solo datos del mismo mes y año que la fecha pedida
-                valores_previos = df_infl_mx[
-                    (df_infl_mx["Fecha"].dt.month == fecha_dt.month) &
-                    (df_infl_mx["Fecha"].dt.year == fecha_dt.year)
-                ][columna_objetivo].dropna()
-                
-                if not valores_previos.empty:
-                    # tomar el último valor de ese mes
-                    ultimo_valor = valores_previos.iloc[-1]
-                    valor_fmt = f"{ultimo_valor*100:.2f}%"
-                else:
-                    valor_fmt = f"No encontré datos de {columna_objetivo} en {fecha_dt.strftime('%B %Y')}"
-
-
-            elif columna_objetivo in ["Inflación Anual US", "Inflación Subyacente US"]:
-                valores_previos = df_infl_us[df_infl_us["Fecha"] <= fecha_fin][columna_objetivo].dropna()
-                if not valores_previos.empty:
-                    ultimo_valor = valores_previos.iloc[-1]
-                    promedio_fmt = f"{ultimo_valor*100:.2f}%"
-                else:
-                    promedio_fmt = "N/D"
-            else:
-                try:
-                    promedio_fmt = formatear_porcentaje_decimal(float(promedio))
-                except:
-                    promedio_fmt = "N/D"
-
-            return jsonify({
-                "respuesta": f"El promedio de {columna_objetivo} entre {fecha_inicio} y {fecha_fin} fue {promedio_fmt}.",
-                "columna": columna_objetivo
-            })
-
-        # ------------------------------
-        # Caso VALOR puntual
-        # ------------------------------
-        else:
-            fecha_dt = fecha_fin or obtener_fecha_mas_reciente(df_economia)
-            df_dia = df_economia[df_economia["Fecha"] == fecha_dt]
-            if df_dia.empty:
-                ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
-                df_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
-            if df_dia.empty or columna_objetivo not in df_dia.columns:
-                return jsonify({"respuesta": f"No encontré datos de {columna_objetivo} para {fecha_dt}."})
-
-            valor = df_dia[columna_objetivo].values[0]
-
-            # Aplicar formato según la columna
-            if columna_objetivo in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
-                valor_fmt = f"${float(valor):,.2f}"
-            elif columna_objetivo in ["Tasa de Interés Objetivo Banxico", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días","Tasa efectiva FED", "Rango objetivo superior FED", "Rango objetivo inferior FED"]:
-                valor_fmt = formatear_porcentaje_decimal(float(valor))
-            elif columna_objetivo == "SOFR":
-                valor_fmt = formatear_porcentaje_decimal(float(valor))
-            elif columna_objetivo in ["% Dow Jones", "% S&P500", "% Nasdaq"]:
-                valor_fmt = format_signed_pct(valor)
-            elif columna_objetivo in ["1M Treasury", "3M Treasury", "6M Treasury", "1Y Treasury",
-                          "2Y Treasury", "3Y Treasury", "5Y Treasury", "7Y Treasury",
-                          "10Y Treasury", "20Y Treasury", "30Y Treasury"]:
-                valor_fmt = formatear_porcentaje_decimal(float(valor))
-    
-            elif columna_objetivo in ["Inflación Anual MEX", "Inflación Subyacente MEX"]:
-                valores_previos = df_infl_mx[df_infl_mx["Fecha"] <= fecha_dt][columna_objetivo].dropna()
-                if not valores_previos.empty:
-                    ultimo_valor = valores_previos.iloc[-1]
-                    valor_fmt = f"{ultimo_valor*100:.2f}%"
-                else:
-                    valor_fmt = "N/D"
-            elif columna_objetivo in ["Inflación Anual US", "Inflación Subyacente US"]:
-                # Si la pregunta menciona un mes, toma todos los valores de ese mes
-                valores_previos = df_infl_us[
-                    (df_infl_us["Fecha"].dt.month == fecha_dt.month) &
-                    (df_infl_us["Fecha"].dt.year == fecha_dt.year)
-                ][columna_objetivo].dropna()
-                
-                if not valores_previos.empty:
-                    # último valor del mes
-                    ultimo_valor = valores_previos.iloc[-1]
-                    valor_fmt = f"{ultimo_valor*100:.2f}%"
-                else:
-                    valor_fmt = f"No encontré datos de {columna_objetivo} en {fecha_dt.strftime('%B %Y')}"
-
-            return jsonify({
-                "respuesta": f"El valor de {columna_objetivo} en {fecha_dt} fue {valor_fmt}.",
-                "columna": columna_objetivo
-            })
-    # ------------------------------
-    # 2️⃣ Si no es indicador económico → lógica de noticias
-    # ------------------------------
+    # 1️⃣ Detectar sentimiento deseado
     sentimiento_deseado = detectar_sentimiento_deseado(q)
 
+    # 2️⃣ Detectar fecha o rango
     fecha_inicio, fecha_fin = extraer_rango_fechas(q)
     if fecha_inicio and fecha_fin:
-        df_filtrado = df[(df["Fecha"].dt.date >= fecha_inicio) & (df["Fecha"].dt.date <= fecha_fin)]
+        df_fecha = df[(df["Fecha"].dt.date >= fecha_inicio) & (df["Fecha"].dt.date <= fecha_fin)]
     else:
         fecha_inicio, fecha_fin = extraer_fechas(q)
-
-    if fecha_inicio and fecha_fin:
-        df_filtrado = df[(df["Fecha"].dt.date >= fecha_inicio) & (df["Fecha"].dt.date <= fecha_fin)]
-    else:
-        fecha_dt = obtener_fecha_mas_reciente(df)
-        df_filtrado = df[df["Fecha"].dt.date == fecha_dt]
-
-    entidades = extraer_entidades(q)
-    df_filtrado = filtrar_titulares(df_filtrado, entidades, sentimiento_deseado)
-
-    if df_filtrado.empty:
         if fecha_inicio and fecha_fin:
-            return jsonify({"respuesta": f"No encontré noticias relacionadas con tu pregunta entre {fecha_inicio} y {fecha_fin}."})
+            df_fecha = df[(df["Fecha"].dt.date >= fecha_inicio) & (df["Fecha"].dt.date <= fecha_fin)]
         else:
-            return jsonify({"respuesta": f"No encontré noticias relacionadas con tu pregunta para {fecha_dt}."})
+            fecha_dt = obtener_fecha_mas_reciente(df)
+            df_fecha = df[df["Fecha"].dt.date == fecha_dt]
 
-    tfidf = TfidfVectorizer()
-    tfidf_matrix = tfidf.fit_transform(df_filtrado["Título"])
-    pregunta_vec = tfidf.transform([q])
-    similitudes = cosine_similarity(pregunta_vec, tfidf_matrix).flatten()
-    top_indices = similitudes.argsort()[-5:][::-1]
-    titulares_relevantes = df_filtrado.iloc[top_indices]
+    # 3️⃣ Extraer entidades
+    entidades = extraer_entidades(q)
 
-    prompt = "Con base en los siguientes titulares de noticias, responde la pregunta de forma contextual y sin inventar datos. Redacta en al menos 100 palabras, en tono profesional:\n\n"
-    for _, row in titulares_relevantes.iterrows():
-        prompt += f"- {row['Título']} ({row['Fuente']})\n"
-    prompt += f"\nPregunta: {q}\nRespuesta:"
+    # 4️⃣ Filtrar titulares por fecha/entidades/sentimiento
+    df_filtrado = filtrar_titulares(df_fecha, entidades, sentimiento_deseado)
+    if df_filtrado.empty:
+        return jsonify({"respuesta": f"No encontré noticias relacionadas con tu pregunta."})
 
+    # 5️⃣ Buscar semánticamente con embeddings (FAISS o TF-IDF fallback)
+    top_rows = buscar_semantica_noticias(q, df_filtrado, top_k=200)
+
+    # 6️⃣ Construir prompt para GPT
+    listado = "".join([f"- {r['Título']} ({r['Fuente']})\n" for _, r in top_rows.iterrows()])
+    prompt = f"""{CONTEXTO_POLITICO}
+
+Con base exclusivamente en estos titulares, responde la pregunta sin inventar datos.
+Redacta al menos 120 palabras, tono profesional, claro y con contexto económico/político.
+
+Titulares:
+{listado}
+Pregunta: {q}
+
+Respuesta:"""
+
+    # 7️⃣ Llamada al modelo
     respuesta = client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Eres un analista experto en medios económicos y políticos."},
+            {"role": "system", "content": "Eres un analista experto en noticias económicas y políticas. No inventes datos."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.2,
-        max_tokens=700
+        max_tokens=650
     )
-    respuesta_gpt = respuesta.choices[0].message.content
+    texto = respuesta.choices[0].message.content.strip()
 
     titulares_info = [
         {"titulo": row["Título"], "medio": row["Fuente"], "enlace": row["Enlace"]}
-        for _, row in titulares_relevantes.iterrows()
-    ][:5]
+        for _, row in top_rows.iterrows()
+    ]
 
     return jsonify({
-        "respuesta": respuesta_gpt,
-        "titulares_usados": titulares_info
+        "respuesta": texto,
+        "titulares": titulares_info,
+        "filtros": {
+            "entidades": entidades,
+            "sentimiento": sentimiento_deseado,
+            "rango": [str(fecha_inicio) if fecha_inicio else None, str(fecha_fin) if fecha_fin else None],
+            "rag": "faiss" if USE_FAISS else "tfidf"
+        }
     })
+
 
 
 
