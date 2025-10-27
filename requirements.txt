@@ -5,7 +5,7 @@ requests
 matplotlib
 wordcloud
 Pillow
-numpy
+numpy==1.26.4
 openpyxl
 scikit-learn
 dateparser
