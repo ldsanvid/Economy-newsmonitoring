@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: monitoreo-backend
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn backend_final:app"
+    pythonVersion: 3.10.13
