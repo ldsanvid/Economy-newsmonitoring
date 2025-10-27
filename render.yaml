@@ -1,7 +1,5 @@
 services:
   - type: web
     name: monitoreo-backend
-    env: python
+    env: docker
     plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn backend_final:app"
