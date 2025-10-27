@@ -45,9 +45,9 @@ def home():
 # ------------------------------
 # Noticias
 try:
-    df = pd.read_csv("noticias_fondo con todas las fuentes_rango_03-07-2025.csv", encoding="utf-8")
+    df = pd.read_csv("noticias_fondo_fuentes_rango_03-07-2025.csv", encoding="utf-8")
 except UnicodeDecodeError:
-    df = pd.read_csv("noticias_fondo con todas las fuentes_rango_03-07-2025.csv", encoding="latin-1")
+    df = pd.read_csv("noticias_fondo_fuentes_rango_03-07-2025.csv", encoding="latin-1")
 df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce", dayfirst=True)
 df = df.dropna(subset=["Fecha", "Título"])
 # 🛠️ Funciones de formateo para indicadores económicos
@@ -97,20 +97,20 @@ ORDEN_COLUMNAS = [
             "Inflación Subyacente US"
         ]
 # Indicadores económicos
-df_tipo_cambio = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tipo de Cambio")
-df_tasas = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tasas de interés")
-df_tasas_us = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Tasas de interés US2")
+df_tipo_cambio = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="Tipo de Cambio")
+df_tasas = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="Tasas de interés")
+df_tasas_us = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="Tasas de interés US2")
 df_economia = df_tipo_cambio.merge(df_tasas, on=["Año", "Fecha"], how="outer")
 df_economia = df_economia.merge(df_tasas_us, on=["Año", "Fecha"], how="outer").fillna("")
 # Cargar hojas adicionales
-df_sofr = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Treasuries_SOFR")
-df_wall = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="Wallstreet")
-df_infl_us = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónUS")
+df_sofr = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="Treasuries_SOFR")
+df_wall = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="Wallstreet")
+df_infl_us = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="InflaciónUS")
 df_infl_us = df_infl_us.rename(columns={
     "Inflación Anual": "Inflación Anual US",
     "Inflación Subyacente": "Inflación Subyacente US"
 })
-df_infl_mx = pd.read_excel("tipo de cambio y tasas de interés.xlsx", sheet_name="InflaciónMEX")
+df_infl_mx = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="InflaciónMEX")
 df_infl_mx = df_infl_mx.rename(columns={
     "Inflación Anual": "Inflación Anual MEX",
     "Inflación Subyacente": "Inflación Subyacente MEX"
