@@ -1140,12 +1140,15 @@ def enviar_email():
 def serve_nube(filename):
     return send_from_directory("nubes", filename)
 
-@app.route("/fechas")
-def get_fechas():
-    # Obtener todas las fechas únicas, ordenadas de más reciente a más antigua
-    fechas_unicas = sorted(df["Fecha"].dt.date.unique(), reverse=True)
-    fechas_str = [f.strftime("%Y-%m-%d") for f in fechas_unicas]
-    return jsonify(fechas_str)
+@app.route("/fechas", methods=["GET"])
+def fechas():
+    global df  # 👈 agrega esto
+    if df.empty:
+        print("⚠️ df vacío al solicitar /fechas")
+        return jsonify([])
+    fechas_unicas = sorted(df["Fecha"].dropna().dt.date.unique(), reverse=True)
+    return jsonify([f.strftime("%Y-%m-%d") for f in fechas_unicas])
+
 
 # ------------------------------
 # 📑 Endpoint para análisis semanal
