@@ -900,7 +900,8 @@ def pregunta():
     prompt = f"""{CONTEXTO_POLITICO}
 
 Con base exclusivamente en estos titulares, responde la pregunta sin inventar datos.
-Redacta al menos 120 palabras, tono profesional, claro y con contexto económico/político.
+Redacta al menos 120 palabras, tono profesional, claro y con contexto económico/político pero sin dar análisis.
+Sin dar tu punto de vista, quiero que presentes todo lo que encontraste sobre el tema que se te preguntó(declaraciones de diversos actores u organismos, por ejemplo, para mostrar todas las versiones) dentro del periodo de fechas solicitado.
 
 Titulares:
 {listado}
