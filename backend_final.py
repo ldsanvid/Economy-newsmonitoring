@@ -46,15 +46,33 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 
 print("📁 Base directory:", base_dir)
 
-# Noticias
+# --- Cargar base de noticias ---
 try:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     noticias_path = os.path.join(base_dir, "noticias_fondo_fuentes_rango_03-07-2025.csv")
+    print("📁 Base directory:", base_dir)
     print("Intentando leer:", noticias_path)
+
     df = pd.read_csv(noticias_path, encoding="utf-8")
     print(f"✅ Noticias cargadas: {len(df)} filas")
+    print("🧩 Columnas detectadas:", list(df.columns))
+
+    # Detectar automáticamente la columna de fecha
+    fecha_col = next((c for c in df.columns if "fecha" in c.lower()), None)
+    if fecha_col:
+        df[fecha_col] = pd.to_datetime(df[fecha_col], errors="coerce", dayfirst=True)
+        df = df.rename(columns={fecha_col: "Fecha"}).dropna(subset=["Fecha"])
+        print(f"📅 Columna '{fecha_col}' convertida correctamente. Rango:",
+              df["Fecha"].min(), "→", df["Fecha"].max())
+    else:
+        print("⚠️ No se encontró columna con 'fecha' en el nombre.")
+        df["Fecha"] = pd.NaT
+
 except Exception as e:
     print(f"❌ Error al cargar CSV de noticias: {e}")
     df = pd.DataFrame()
+
+
 
 # 🛠️ Funciones de formateo para indicadores económicos
 # ------------------------------
@@ -1142,12 +1160,13 @@ def serve_nube(filename):
 
 @app.route("/fechas", methods=["GET"])
 def fechas():
-    global df  # 👈 agrega esto
+    global df
     if df.empty:
         print("⚠️ df vacío al solicitar /fechas")
         return jsonify([])
     fechas_unicas = sorted(df["Fecha"].dropna().dt.date.unique(), reverse=True)
     return jsonify([f.strftime("%Y-%m-%d") for f in fechas_unicas])
+
 
 
 # ------------------------------
