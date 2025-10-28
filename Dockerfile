@@ -20,8 +20,10 @@ COPY . .
 # ✅ Copiar explícitamente los recursos de datos
 COPY faiss_index/ /app/faiss_index/
 COPY reporte_semanal/ /app/reporte_semanal/
-COPY 'noticias_fondo con todas las fuentes_rango_03-07-2025.csv' /app/
-COPY 'tipo de cambio y tasas de interés.xlsx' /app/
+COPY noticias_fondo_fuentes_rango_03-07-2025.csv /app/
+COPY tipo_cambio_tasas_interes.xlsx /app/
+
+>>>>>>> dockerfix
 
 # Forzar rebuild completo
 RUN echo "forcing rebuild $(date)"
