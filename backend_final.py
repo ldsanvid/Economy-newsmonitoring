@@ -44,15 +44,18 @@ def home():
 # 📂 Carga única de datos — con rutas absolutas seguras
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
+print("📁 Base directory:", base_dir)
+
 # Noticias
 try:
     noticias_path = os.path.join(base_dir, "noticias_fondo_fuentes_rango_03-07-2025.csv")
+    print("Intentando leer:", noticias_path)
     df = pd.read_csv(noticias_path, encoding="utf-8")
-except UnicodeDecodeError:
-    df = pd.read_csv(noticias_path, encoding="latin-1")
+    print(f"✅ Noticias cargadas: {len(df)} filas")
+except Exception as e:
+    print(f"❌ Error al cargar CSV de noticias: {e}")
+    df = pd.DataFrame()
 
-df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce", dayfirst=True)
-df = df.dropna(subset=["Fecha", "Título"])
 # 🛠️ Funciones de formateo para indicadores económicos
 # ------------------------------
 def formatear_porcentaje(x):
@@ -1147,9 +1150,9 @@ def get_fechas():
 # ------------------------------
 # 📑 Endpoint para análisis semanal
 # ------------------------------
-@app.route("/reporte_semanal", methods=["GET"])
+@app.route("/reporte_semanal", methods=["GET"]) 
 def reporte_semanal():
-    carpeta = "reporte_semanal"
+    carpeta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reporte_semanal")
     os.makedirs(carpeta, exist_ok=True)
 
     archivos = [
