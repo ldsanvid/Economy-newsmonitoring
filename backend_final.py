@@ -41,13 +41,16 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 def home():
     return send_file("index.html")
 # ------------------------------
-# 📂 Carga única de datos
-# ------------------------------
+# 📂 Carga única de datos — con rutas absolutas seguras
+base_dir = os.path.dirname(os.path.abspath(__file__))
+
 # Noticias
 try:
-    df = pd.read_csv("noticias_fondo_fuentes_rango_03-07-2025.csv", encoding="utf-8")
+    noticias_path = os.path.join(base_dir, "noticias_fondo_fuentes_rango_03-07-2025.csv")
+    df = pd.read_csv(noticias_path, encoding="utf-8")
 except UnicodeDecodeError:
-    df = pd.read_csv("noticias_fondo_fuentes_rango_03-07-2025.csv", encoding="latin-1")
+    df = pd.read_csv(noticias_path, encoding="latin-1")
+
 df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce", dayfirst=True)
 df = df.dropna(subset=["Fecha", "Título"])
 # 🛠️ Funciones de formateo para indicadores económicos
@@ -96,25 +99,31 @@ ORDEN_COLUMNAS = [
             "Inflación Anual US",
             "Inflación Subyacente US"
         ]
-# Indicadores económicos
-df_tipo_cambio = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="Tipo de Cambio")
-df_tasas = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="Tasas de interés")
-df_tasas_us = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="Tasas de interés US2")
+# 📊 Indicadores económicos (rutas absolutas seguras para Render)
+base_dir = os.path.dirname(os.path.abspath(__file__))
+excel_path = os.path.join(base_dir, "tipo_cambio_tasas_interes.xlsx")
+
+df_tipo_cambio = pd.read_excel(excel_path, sheet_name="Tipo de Cambio")
+df_tasas = pd.read_excel(excel_path, sheet_name="Tasas de interés")
+df_tasas_us = pd.read_excel(excel_path, sheet_name="Tasas de interés US2")
+
 df_economia = df_tipo_cambio.merge(df_tasas, on=["Año", "Fecha"], how="outer")
 df_economia = df_economia.merge(df_tasas_us, on=["Año", "Fecha"], how="outer").fillna("")
+
 # Cargar hojas adicionales
-df_sofr = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="Treasuries_SOFR")
-df_wall = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="Wallstreet")
-df_infl_us = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="InflaciónUS")
-df_infl_us = df_infl_us.rename(columns={
+df_sofr = pd.read_excel(excel_path, sheet_name="Treasuries_SOFR")
+df_wall = pd.read_excel(excel_path, sheet_name="Wallstreet")
+
+df_infl_us = pd.read_excel(excel_path, sheet_name="InflaciónUS").rename(columns={
     "Inflación Anual": "Inflación Anual US",
     "Inflación Subyacente": "Inflación Subyacente US"
 })
-df_infl_mx = pd.read_excel("tipo_cambio_tasas_interes.xlsx", sheet_name="InflaciónMEX")
-df_infl_mx = df_infl_mx.rename(columns={
+
+df_infl_mx = pd.read_excel(excel_path, sheet_name="InflaciónMEX").rename(columns={
     "Inflación Anual": "Inflación Anual MEX",
     "Inflación Subyacente": "Inflación Subyacente MEX"
 })
+
 # ------------------------------
 # 🧠 Carga del índice FAISS (para búsqueda semántica) — con rutas absolutas y diagnóstico
 # ------------------------------
