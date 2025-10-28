@@ -1161,11 +1161,28 @@ def serve_nube(filename):
 @app.route("/fechas", methods=["GET"])
 def fechas():
     global df
-    if df.empty:
-        print("⚠️ df vacío al solicitar /fechas")
+    try:
+        if df.empty:
+            print("⚠️ DataFrame vacío al solicitar /fechas")
+            return jsonify([])
+
+        # Normalizar tipo de dato (maneja tanto datetime64 como date)
+        if pd.api.types.is_datetime64_any_dtype(df["Fecha"]):
+            fechas_unicas = df["Fecha"].dropna().dt.date.unique()
+        else:
+            # Si ya son objetos date o strings convertibles
+            fechas_unicas = pd.to_datetime(df["Fecha"], errors="coerce").dropna().dt.date.unique()
+
+        fechas_ordenadas = sorted(fechas_unicas, reverse=True)
+        fechas_str = [f.strftime("%Y-%m-%d") for f in fechas_ordenadas]
+
+        print(f"🗓️ /fechas → {len(fechas_str)} fechas detectadas (rango {fechas_str[-1]} → {fechas_str[0]})")
+        return jsonify(fechas_str)
+
+    except Exception as e:
+        print(f"❌ Error en /fechas: {e}")
         return jsonify([])
-    fechas_unicas = sorted(df["Fecha"].dropna().dt.date.unique(), reverse=True)
-    return jsonify([f.strftime("%Y-%m-%d") for f in fechas_unicas])
+
 
 
 
