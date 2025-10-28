@@ -23,8 +23,6 @@ COPY reporte_semanal/ /app/reporte_semanal/
 COPY noticias_fondo_fuentes_rango_03-07-2025.csv /app/
 COPY tipo_cambio_tasas_interes.xlsx /app/
 
->>>>>>> dockerfix
-
 # Forzar rebuild completo
 RUN echo "forcing rebuild $(date)"
 
