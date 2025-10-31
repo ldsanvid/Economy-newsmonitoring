@@ -18,7 +18,8 @@ s3 = session.client(
     endpoint_url=ENDPOINT,
     aws_access_key_id=ACCESS_KEY,
     aws_secret_access_key=SECRET_KEY,
-    config=config,  # 👈 esta línea hace que se aplique la firma S3v4
+    config=config,
+    verify=False
 )
 
 
