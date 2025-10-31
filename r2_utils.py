@@ -1,5 +1,7 @@
 import os
 import boto3
+import botocore.client
+
 
 # 🌐 Variables de entorno (las que ya pusiste en Render)
 BUCKET = os.environ.get("R2_BUCKET")
@@ -9,12 +11,16 @@ SECRET_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
 
 # ⚙️ Cliente S3 compatible con Cloudflare R2
 session = boto3.session.Session()
+config = botocore.client.Config(signature_version="s3v4")
+
 s3 = session.client(
     "s3",
     endpoint_url=ENDPOINT,
     aws_access_key_id=ACCESS_KEY,
     aws_secret_access_key=SECRET_KEY,
+    config=config,  # 👈 esta línea hace que se aplique la firma S3v4
 )
+
 
 FAISS_DIR = "faiss_index"
 FILES = [
