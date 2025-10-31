@@ -11,5 +11,6 @@ scikit-learn
 dateparser
 flask_cors
 Babel
+boto3
 faiss-cpu==1.7.4
 gunicorn
