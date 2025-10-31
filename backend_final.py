@@ -24,6 +24,10 @@ import base64
 import requests
 import calendar
 from babel.dates import format_date
+from flask_cors import CORS
+from r2_utils import r2_download_all, r2_upload
+
+
 
 def nombre_mes(fecha):
     """Devuelve la fecha con mes en español, ej: 'agosto 2025'"""
@@ -37,6 +41,13 @@ app = Flask(__name__)
 from flask_cors import CORS
 CORS(app)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+# 🔄 Sincronizar índices y metadatos desde Cloudflare R2 al iniciar
+try:
+    r2_download_all()
+    print("✅ Archivos FAISS/CSV sincronizados desde R2")
+except Exception as e:
+    print(f"⚠️ No se pudo sincronizar desde R2: {e}")
+
 @app.route("/")
 def home():
     return send_file("index.html")
