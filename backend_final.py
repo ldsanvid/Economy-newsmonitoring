@@ -25,7 +25,7 @@ import requests
 import calendar
 from babel.dates import format_date
 from flask_cors import CORS
-from r2_utils import r2_download_all, r2_upload
+from s3_utils import s3_download_all as r2_download_all, s3_upload as r2_upload
 
 
 
