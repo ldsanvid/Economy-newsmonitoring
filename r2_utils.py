@@ -1,13 +1,19 @@
 import os
 import boto3
 import botocore.client
+import ssl
+import urllib3
 
 
 # 🌐 Variables de entorno (las que ya pusiste en Render)
 BUCKET = os.environ.get("R2_BUCKET")
-ENDPOINT = os.environ.get("R2_ENDPOINT")
+ENDPOINT = f"https://monitoreo-plus.r2.cloudflarestorage.com"
 ACCESS_KEY = os.environ.get("R2_ACCESS_KEY_ID")
 SECRET_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
+
+ssl_context = ssl.create_default_context()
+ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ⚙️ Cliente S3 compatible con Cloudflare R2
 session = boto3.session.Session()
