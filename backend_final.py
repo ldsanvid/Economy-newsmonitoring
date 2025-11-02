@@ -545,7 +545,7 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
         orden = {t:i for i,t in enumerate(candidatos["Título"].tolist())}
         mergeado["__rank"] = mergeado["Título"].map(orden)
         mergeado = mergeado.sort_values("__rank").drop(columns="__rank")
-        return mergeado.head(5)
+        return mergeado.head(10)
 
     except Exception:
         tfidf = TfidfVectorizer()
@@ -553,7 +553,7 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
         v = tfidf.transform([q])
         sims = cosine_similarity(v, X).flatten()
         idx = sims.argsort()[-5:][::-1]
-        return df_base.iloc[idx]
+        return df_base.iloc[idx[:10]]
 
 
 
@@ -656,27 +656,26 @@ def generar_resumen_y_datos(fecha_str):
     )
     CONTEXTO_ANTERIOR = ""
     try:
-        # Ruta donde se guardan los resúmenes previos
         meta_path = "faiss_index/resumenes_metadata.csv"
-
-        # Verifica si existe el archivo con metadatos de resúmenes previos
         if os.path.exists(meta_path):
             df_prev = pd.read_csv(meta_path)
 
             if len(df_prev) > 0:
-                # Obtiene el resumen más reciente (última fila del CSV)
-                last_row = df_prev.iloc[-1]
-                last_fecha = last_row["fecha"]
-                last_resumen = last_row["resumen"]
+                # Tomar los últimos 5 resúmenes (o menos si hay menos registros)
+                ultimos = df_prev.tail(5)
+                contexto_texto = "\n\n".join(
+                    [f"({row['fecha']}) {row['resumen'].strip()}" for _, row in ultimos.iterrows()]
+                )
 
-                # Construye un bloque de contexto para el prompt
                 CONTEXTO_ANTERIOR = f"""
-                CONTEXTO DEL DÍA ANTERIOR ({last_fecha}):
-                {last_resumen.strip()}
+                CONTEXTO DE LOS ÚLTIMOS {len(ultimos)} DÍAS:
+                {contexto_texto}
                 """
-                print(f"🔗 Contexto narrativo cargado desde {last_fecha}")
+
+                print(f"🔗 Contexto narrativo cargado con {len(ultimos)} días previos (último: {ultimos.iloc[-1]['fecha']})")
     except Exception as e:
         print(f"⚠️ No se pudo cargar el contexto narrativo: {e}")
+
     prompt = f"""
     
     {CONTEXTO_ANTERIOR}
@@ -984,76 +983,104 @@ def extraer_rango_fechas(pregunta):
 @app.route("/pregunta", methods=["POST"])
 def pregunta():
     data = request.get_json()
-    q = data.get("pregunta", "")
+    q = data.get("pregunta", "").strip()
     if not q:
         return jsonify({"respuesta": "No se proporcionó una pregunta."}), 400
 
-    # 1️⃣ Detectar sentimiento deseado
-    sentimiento_deseado = detectar_sentimiento_deseado(q)
+    # 🧩 1️⃣ Cargar índice FAISS y metadata
+    index_path = "faiss_index/noticias_index.faiss"
+    meta_path = "faiss_index/noticias_metadata.csv"
 
-    # 2️⃣ Detectar fecha o rango
+    if not os.path.exists(index_path) or not os.path.exists(meta_path):
+        return jsonify({"respuesta": "El índice FAISS o el archivo de metadatos no están disponibles."}), 500
+
+    df_meta = pd.read_csv(meta_path)
+    df_meta.dropna(subset=["Título"], inplace=True)
+
+    # 🧩 2️⃣ Calcular embedding de la pregunta
+    emb_q = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=q
+    ).data[0].embedding
+    vq = np.array([emb_q], dtype="float32")
+
+    # 🧩 3️⃣ Buscar en FAISS (obtenemos los 200 más similares para refinar después)
+    index = faiss.read_index(index_path)
+    sims, ids = index.search(vq, 200)
+    top_raw = df_meta.iloc[ids[0]].copy()
+    top_raw["similitud"] = sims[0]
+
+    # 🧩 4️⃣ Filtros ligeros automáticos (sin bloquear FAISS)
+    q_lower = q.lower()
+    if any(p in q_lower for p in ["positiv", "negativ", "neutral"]):
+        if "positiv" in q_lower:
+            top_raw = top_raw[top_raw["Sentimiento"] == "Positiva"]
+        elif "negativ" in q_lower:
+            top_raw = top_raw[top_raw["Sentimiento"] == "Negativa"]
+        elif "neutral" in q_lower:
+            top_raw = top_raw[top_raw["Sentimiento"] == "Neutral"]
+
+    # 🧩 5️⃣ Detección simple de rango de fechas (si hay “del… al…” o “entre… y…”)
     fecha_inicio, fecha_fin = extraer_rango_fechas(q)
     if fecha_inicio and fecha_fin:
-        df_fecha = df[(df["Fecha"].dt.date >= fecha_inicio) & (df["Fecha"].dt.date <= fecha_fin)]
-    else:
-        fecha_inicio, fecha_fin = extraer_fechas(q)
-        if fecha_inicio and fecha_fin:
-            df_fecha = df[(df["Fecha"].dt.date >= fecha_inicio) & (df["Fecha"].dt.date <= fecha_fin)]
-        else:
-            fecha_dt = obtener_fecha_mas_reciente(df)
-            df_fecha = df[df["Fecha"].dt.date == fecha_dt]
+        top_raw["Fecha"] = pd.to_datetime(top_raw["Fecha"], errors="coerce")
+        top_raw = top_raw[
+            (top_raw["Fecha"].dt.date >= fecha_inicio)
+            & (top_raw["Fecha"].dt.date <= fecha_fin)
+        ]
 
-    # 3️⃣ Extraer entidades
-    entidades = extraer_entidades(q)
+    # 🧩 6️⃣ Reordenar y tomar los 10 más relevantes finales
+    top_final = top_raw.sort_values("similitud", ascending=False).head(10)
 
-    # 4️⃣ Filtrar titulares por fecha/entidades/sentimiento
-    df_filtrado = filtrar_titulares(df_fecha, entidades, sentimiento_deseado)
-    if df_filtrado.empty:
-        return jsonify({"respuesta": f"No encontré noticias relacionadas con tu pregunta."})
+    # 🧩 7️⃣ Construir contexto para GPT (trazabilidad total)
+    contexto = "\n".join([
+        f"- {row['Título']} ({row['Fuente']}, {row['Fecha']})" for _, row in top_final.iterrows()
+    ])
 
-    # 5️⃣ Buscar semánticamente con embeddings (FAISS o TF-IDF fallback)
-    top_rows = buscar_semantica_noticias(q, df_filtrado, top_k=200)
+    prompt = f"""{CONTEXTO_POLITICO} 
+    
+Responde la siguiente pregunta de forma clara, profesional y analítica.
+Usa únicamente la información que aparece en los titulares listados a continuación.
+No inventes datos, y redacta una respuesta de entre 150 y 200 palabras en tono ejecutivo, como para un resumen de prensa, en caso de que encuentres información de la consulta.
+Si no encuentras información de la consulta, solo di que no tienes información al respecto.
 
-    # 6️⃣ Construir prompt para GPT
-    listado = "".join([f"- {r['Título']} ({r['Fuente']})\n" for _, r in top_rows.iterrows()])
-    prompt = f"""{CONTEXTO_POLITICO}
-
-Con base exclusivamente en estos titulares, responde la pregunta sin inventar datos.
-Redacta al menos 120 palabras, tono profesional, claro y con contexto económico/político pero sin dar análisis.
-Sin dar tu punto de vista, quiero que presentes todo lo que encontraste sobre el tema que se te preguntó(declaraciones de diversos actores u organismos, por ejemplo, para mostrar todas las versiones) dentro del periodo de fechas solicitado.
-
-Titulares:
-{listado}
 Pregunta: {q}
 
-Respuesta:"""
+Titulares relevantes (máx. 10):
+{contexto}
 
-    # 7️⃣ Llamada al modelo
+Respuesta:
+"""
+
+    # 🧩 8️⃣ Llamada a OpenAI
     respuesta = client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Eres un analista experto en noticias económicas y políticas. No inventes datos."},
+            {"role": "system", "content": "Eres un analista de medios experto en política y economía. Responde solo con base en los titulares dados."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.2,
-        max_tokens=650
+        temperature=0.25,
+        max_tokens=700
     )
-    texto = respuesta.choices[0].message.content.strip()
 
+    texto_respuesta = respuesta.choices[0].message.content.strip()
+
+    # 🧩 9️⃣ Construir salida con trazabilidad completa
     titulares_info = [
-        {"titulo": row["Título"], "medio": row["Fuente"], "enlace": row["Enlace"]}
-        for _, row in top_rows.iterrows()
+        {
+            "titulo": row["Título"],
+            "medio": row["Fuente"],
+            "fecha": str(row["Fecha"]),
+            "enlace": row["Enlace"]
+        }
+        for _, row in top_final.iterrows()
     ]
 
     return jsonify({
-        "respuesta": texto,
-        "titulares": titulares_info,
-        "filtros": {
-            "entidades": entidades,
-            "sentimiento": sentimiento_deseado,
-            "rango": [str(fecha_inicio) if fecha_inicio else None, str(fecha_fin) if fecha_fin else None],
-            "rag": "faiss" if USE_FAISS else "tfidf"
-        }
+        "respuesta": texto_respuesta,
+        "titulares_usados": titulares_info,
+        "n_total_encontrados": len(top_raw),
+        "n_usados": len(top_final)
     })
 
 
