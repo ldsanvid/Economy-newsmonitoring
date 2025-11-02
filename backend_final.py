@@ -683,7 +683,9 @@ def generar_resumen_y_datos(fecha_str):
 
     {CONTEXTO_POLITICO}
 
-Redacta un resumen de noticias del {fecha_str} dividido en cinco párrafos. Tono profesional, objetivo y dirigido a tomadores de decisiones. De 400 palabras.
+Redacta un resumen de noticias del {fecha_str} dividido en cinco párrafos. Tono profesional, objetivo y dirigido a tomadores de decisiones. De 400 palabras. Antes de empezar a redactar, revisa {CONTEXTO_ANTERIOR}, si existe. Utilízalo para darle continuidad narrativa. Si en el resumen anterior se presenta x noticia y en las noticias del nuevo día se vuelve a hacer mención de la misma, retómalo para únicamente contar lo que es nuevo (ya sea nuevos desarrollos, nuevas reacciones) pero sin volver a contarlo como si fuera la primera vez. 
+
+Luego de hacer esa revisión y considerarla antes de empezar a redactar:
 
 Primer párrafo: Describe y contextualiza el tema más repetido del día (qué, quién, cómo). Sin dar tu punto de vista, quiero que presentes todo lo que encontraste sobre ese tema (declaraciones de diversos actores u organismos, por ejemplo, para mostrar todas las versiones).
 
