@@ -520,7 +520,7 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
 
     try:
         emb_q = client.embeddings.create(
-            model="text-embedding-3-small", input=q
+            model="text-embedding-3-large", input=q
         ).data[0].embedding
 
         vq = np.array(emb_q, dtype="float32")[np.newaxis, :]
@@ -999,7 +999,7 @@ def pregunta():
 
     # 🧩 2️⃣ Calcular embedding de la pregunta
     emb_q = client.embeddings.create(
-        model="text-embedding-3-small",
+        model="text-embedding-3-large",
         input=q
     ).data[0].embedding
     vq = np.array([emb_q], dtype="float32")
@@ -1038,7 +1038,7 @@ def pregunta():
     ])
 
     prompt = f"""{CONTEXTO_POLITICO} 
-    
+
 Responde la siguiente pregunta de forma clara, profesional y analítica.
 Usa únicamente la información que aparece en los titulares listados a continuación.
 No inventes datos, y redacta una respuesta de entre 150 y 200 palabras en tono ejecutivo, como para un resumen de prensa, en caso de que encuentres información de la consulta.
