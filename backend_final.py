@@ -865,6 +865,9 @@ Noticias no relacionadas con aranceles:
         # ------------------------------
     # 💾 Guardar resumen y subir a S3
     # ------------------------------
+    # ------------------------------
+    # 💾 Guardar resumen y subir a S3 (modo append con control de duplicados)
+    # ------------------------------
     try:
         from s3_utils import s3_upload
 
@@ -879,12 +882,28 @@ Noticias no relacionadas con aranceles:
             "resumen": resumen_texto.strip().replace("\n", " ")
         }])
 
-        df_resumen.to_csv(resumen_meta_path, index=False, encoding="utf-8")
-        print(f"💾 Guardado local de resumenes_metadata.csv con {len(df_resumen)} fila(s)")
+        # Si ya existe el archivo, lo leemos y agregamos (sin duplicar fechas)
+        if os.path.exists(resumen_meta_path):
+            df_prev = pd.read_csv(resumen_meta_path)
+
+            if str(fecha_dt) not in df_prev["fecha"].astype(str).values:
+                df_total = pd.concat([df_prev, df_resumen], ignore_index=True)
+                print(f"🆕 Agregado nuevo resumen para {fecha_dt}")
+            else:
+                print(f"♻️ Reemplazando resumen existente para {fecha_dt}")
+                df_prev.loc[df_prev["fecha"].astype(str) == str(fecha_dt), :] = df_resumen.iloc[0]
+                df_total = df_prev
+        else:
+            df_total = df_resumen
+
+        # Guardar y subir
+        df_total.to_csv(resumen_meta_path, index=False, encoding="utf-8")
+        print(f"💾 Guardado local de resumenes_metadata.csv con {len(df_total)} fila(s) totales")
         s3_upload("resumenes_metadata.csv")
         print("☁️ Subido resumenes_metadata.csv a S3")
     except Exception as e:
         print(f"⚠️ No se pudo guardar/subir resumenes_metadata.csv: {e}")
+
 
     return ({
         "resumen": resumen_texto,
