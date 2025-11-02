@@ -1032,25 +1032,53 @@ def pregunta():
     # 🧩 6️⃣ Reordenar y tomar los 10 más relevantes finales
     top_final = top_raw.sort_values("similitud", ascending=False).head(10)
 
+    # 🧠 6B️⃣ Buscar también en FAISS de resúmenes, si existe
+    resumen_index_path = "faiss_index/resumenes_index.faiss"
+    resumen_meta_path = "faiss_index/resumenes_metadata.csv"
+
+    contexto_resumenes = ""
+    if os.path.exists(resumen_index_path) and os.path.exists(resumen_meta_path):
+        try:
+            df_resumenes = pd.read_csv(resumen_meta_path)
+            index_resumenes = faiss.read_index(resumen_index_path)
+
+            # Reutilizamos el embedding ya generado (emb_q)
+            vq = np.array([emb_q], dtype="float32")
+
+            sims_r, ids_r = index_resumenes.search(vq, 3)  # top 3 resúmenes más similares
+            top_resumenes = df_resumenes.iloc[ids_r[0]].copy()
+
+            contexto_resumenes = "\n\n".join([
+                f"📅 {row['fecha']}: {row['resumen'][:500]}..."  # limitamos texto para no saturar tokens
+                for _, row in top_resumenes.iterrows()
+            ])
+            print(f"🧠 Se añadieron {len(top_resumenes)} resúmenes relevantes al contexto.")
+        except Exception as e:
+            print(f"⚠️ No se pudo consultar FAISS de resúmenes: {e}")
+
+
     # 🧩 7️⃣ Construir contexto para GPT (trazabilidad total)
     contexto = "\n".join([
         f"- {row['Título']} ({row['Fuente']}, {row['Fecha']})" for _, row in top_final.iterrows()
     ])
 
-    prompt = f"""{CONTEXTO_POLITICO} 
+    prompt = f"""{CONTEXTO_POLITICO}
 
 Responde la siguiente pregunta de forma clara, profesional y analítica.
-Usa únicamente la información que aparece en los titulares listados a continuación.
-No inventes datos, y redacta una respuesta de entre 150 y 200 palabras en tono ejecutivo, como para un resumen de prensa, en caso de que encuentres información de la consulta.
-Si no encuentras información de la consulta, solo di que no tienes información al respecto.
+Usa **únicamente** la información proporcionada: los titulares listados y, si existen, los resúmenes previos.
+No inventes datos, y redacta una respuesta de entre 150 y 200 palabras en tono ejecutivo.
 
 Pregunta: {q}
 
-Titulares relevantes (máx. 10):
+📚 Resúmenes previos relevantes (si los hay):
+{contexto_resumenes if contexto_resumenes else "Ninguno"}
+
+🗞️ Titulares relevantes (máx. 10):
 {contexto}
 
 Respuesta:
 """
+
 
     # 🧩 8️⃣ Llamada a OpenAI
     respuesta = client.chat.completions.create(
