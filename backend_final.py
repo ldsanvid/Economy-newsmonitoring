@@ -26,6 +26,8 @@ import calendar
 from babel.dates import format_date
 from flask_cors import CORS
 from s3_utils import s3_download_all as r2_download_all, s3_upload as r2_upload
+import numpy as np
+import faiss
 
 
 
@@ -652,8 +654,33 @@ def generar_resumen_y_datos(fecha_str):
     contexto_otros_temas = "\n".join(
         f"- {row['Título']}" for _, row in noticias_otras_forzadas.iterrows()
     )
+    CONTEXTO_ANTERIOR = ""
+    try:
+        # Ruta donde se guardan los resúmenes previos
+        meta_path = "faiss_index/resumenes_metadata.csv"
 
+        # Verifica si existe el archivo con metadatos de resúmenes previos
+        if os.path.exists(meta_path):
+            df_prev = pd.read_csv(meta_path)
+
+            if len(df_prev) > 0:
+                # Obtiene el resumen más reciente (última fila del CSV)
+                last_row = df_prev.iloc[-1]
+                last_fecha = last_row["fecha"]
+                last_resumen = last_row["resumen"]
+
+                # Construye un bloque de contexto para el prompt
+                CONTEXTO_ANTERIOR = f"""
+                CONTEXTO DEL DÍA ANTERIOR ({last_fecha}):
+                {last_resumen.strip()}
+                """
+                print(f"🔗 Contexto narrativo cargado desde {last_fecha}")
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar el contexto narrativo: {e}")
     prompt = f"""
+    
+    {CONTEXTO_ANTERIOR}
+
     {CONTEXTO_POLITICO}
 
 Redacta un resumen de noticias del {fecha_str} dividido en cinco párrafos. Tono profesional, objetivo y dirigido a tomadores de decisiones. De 400 palabras.
@@ -833,6 +860,31 @@ Noticias no relacionadas con aranceles:
             if len(titulares_info_en) >= 8:
                 break
 
+        # ------------------------------
+    # 💾 Guardar resumen y subir a S3
+    # ------------------------------
+    try:
+        from s3_utils import s3_upload
+        import pandas as pd
+        import os
+
+        os.makedirs("faiss_index", exist_ok=True)
+        resumen_meta_path = "faiss_index/resumenes_metadata.csv"
+
+        df_resumen = pd.DataFrame([{
+            "fecha": str(fecha_dt),
+            "archivo_txt": f"resumen_{fecha_str}.txt",
+            "nube": archivo_nube,
+            "titulares": len(titulares_info),
+            "resumen": resumen_texto.strip().replace("\n", " ")
+        }])
+
+        df_resumen.to_csv(resumen_meta_path, index=False, encoding="utf-8")
+        print(f"💾 Guardado local de resumenes_metadata.csv con {len(df_resumen)} fila(s)")
+        s3_upload("resumenes_metadata.csv")
+        print("☁️ Subido resumenes_metadata.csv a S3")
+    except Exception as e:
+        print(f"⚠️ No se pudo guardar/subir resumenes_metadata.csv: {e}")
 
     return ({
         "resumen": resumen_texto,

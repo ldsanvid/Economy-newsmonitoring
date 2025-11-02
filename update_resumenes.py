@@ -17,7 +17,7 @@ def cargar_indice_resumenes():
     if os.path.exists(INDEX_PATH):
         index = faiss.read_index(INDEX_PATH)
     else:
-        index = faiss.IndexFlatL2(3072)  # tamaño aprox del embedding de text-embedding-3-large
+        index = faiss.IndexFlatL2(3072)  # tamaño aprox del embedding de text-embedding-3sí-large
     return index
 
 def obtener_resumen_mas_reciente(fecha_actual):
