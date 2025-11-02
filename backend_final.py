@@ -904,6 +904,50 @@ Noticias no relacionadas con aranceles:
     except Exception as e:
         print(f"⚠️ No se pudo guardar/subir resumenes_metadata.csv: {e}")
 
+            # 🧠 --- Embeddings acumulativos para resúmenes ---
+    try:
+        from openai import OpenAI
+        import numpy as np
+        import faiss
+
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+        # Crear carpeta local si no existe
+        os.makedirs("faiss_index", exist_ok=True)
+        index_path = "faiss_index/resumenes_index.faiss"
+        meta_path = "faiss_index/resumenes_metadata.csv"
+
+        # Generar embedding del resumen del día
+        emb = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=resumen_texto.strip()
+        ).data[0].embedding
+        emb_np = np.array([emb], dtype="float32")
+
+        # Si el índice ya existe, cargarlo y agregar nuevo vector
+        if os.path.exists(index_path):
+            index = faiss.read_index(index_path)
+            index.add(emb_np)
+            print(f"🧩 Embedding agregado al índice existente ({index.ntotal} vectores totales)")
+        else:
+            # Crear un nuevo índice
+            dim = len(emb_np[0])
+            index = faiss.IndexFlatL2(dim)
+            index.add(emb_np)
+            print("🆕 Índice FAISS de resúmenes creado")
+
+        # Guardar el índice actualizado
+        faiss.write_index(index, index_path)
+        print("💾 Guardado resumenes_index.faiss actualizado")
+
+        # Subir a S3
+        from s3_utils import s3_upload
+        s3_upload("resumenes_index.faiss")
+        print("☁️ Subido resumenes_index.faiss a S3")
+
+    except Exception as e:
+        print(f"⚠️ Error al actualizar embeddings de resúmenes: {e}")
+
 
     return ({
         "resumen": resumen_texto,
