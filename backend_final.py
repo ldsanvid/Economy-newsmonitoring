@@ -905,14 +905,7 @@ Noticias no relacionadas con aranceles:
         print(f"⚠️ No se pudo guardar/subir resumenes_metadata.csv: {e}")
 
             # 🧠 --- Embeddings acumulativos para resúmenes ---
-    try:
-        from openai import OpenAI
-        import numpy as np
-        import faiss
-
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-        # Crear carpeta local si no existe
+    try:    # Crear carpeta local si no existe
         os.makedirs("faiss_index", exist_ok=True)
         index_path = "faiss_index/resumenes_index.faiss"
         meta_path = "faiss_index/resumenes_metadata.csv"
