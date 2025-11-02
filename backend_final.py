@@ -909,7 +909,7 @@ Noticias no relacionadas con aranceles:
         os.makedirs("faiss_index", exist_ok=True)
         index_path = "faiss_index/resumenes_index.faiss"
         meta_path = "faiss_index/resumenes_metadata.csv"
-
+        
         # Generar embedding del resumen del día
         emb = client.embeddings.create(
             model="text-embedding-3-small",
