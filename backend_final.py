@@ -865,7 +865,6 @@ Noticias no relacionadas con aranceles:
     # ------------------------------
     try:
         from s3_utils import s3_upload
-        import pandas as pd
         import os
 
         os.makedirs("faiss_index", exist_ok=True)
