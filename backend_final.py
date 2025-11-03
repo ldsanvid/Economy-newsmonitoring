@@ -888,15 +888,18 @@ Noticias no relacionadas con aranceles:
         if os.path.exists(resumen_meta_path):
             df_prev = pd.read_csv(resumen_meta_path)
 
-            if str(fecha_dt) not in df_prev["fecha"].astype(str).values:
-                df_total = pd.concat([df_prev, df_resumen], ignore_index=True)
-                print(f"🆕 Agregado nuevo resumen para {fecha_dt}")
-            else:
-                print(f"♻️ Reemplazando resumen existente para {fecha_dt}")
-                df_prev.loc[df_prev["fecha"].astype(str) == str(fecha_dt), :] = df_resumen.iloc[0]
-                df_total = df_prev
+        if str(fecha_dt) not in df_prev["fecha"].astype(str).values:
+            df_total = pd.concat([df_prev, df_resumen], ignore_index=True)
+            print(f"🆕 Agregado nuevo resumen para {fecha_dt}")
         else:
-            df_total = df_resumen
+            print(f"♻️ Reemplazando resumen existente para {fecha_dt}")
+
+            # Alinear columnas antes de reemplazar (previene el error)
+            df_resumen = df_resumen.reindex(columns=df_prev.columns)
+
+            # Reemplazar fila coincidente de forma segura
+            df_prev.loc[df_prev["fecha"].astype(str) == str(fecha_dt), df_prev.columns] = df_resumen.values[0]
+            df_total = df_prev
 
         # Guardar y subir
         df_total.to_csv(resumen_meta_path, index=False, encoding="utf-8")
