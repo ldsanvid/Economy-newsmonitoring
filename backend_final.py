@@ -357,6 +357,7 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - La OCDE (OECD por sus siglas en inglés) es la Organización para la Cooperación y el Desarrollo Económico . 
 - El ECB es el European Central Bank o Banco Europeo Central.
 - Cuando una noticia viene en inglés y hablan de "EU", se refierne a la Unión Europea.
+- PROFEPA es la Procuraduría Federal de Protección al Ambiente de México.
 """
 
 def extraer_fechas(pregunta):
@@ -520,7 +521,7 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
 
     try:
         emb_q = client.embeddings.create(
-            model="text-embedding-3-large", input=q
+            model="text-embedding-3-small", input=q
         ).data[0].embedding
 
         vq = np.array(emb_q, dtype="float32")[np.newaxis, :]
@@ -911,7 +912,7 @@ Noticias no relacionadas con aranceles:
         
         # Generar embedding del resumen del día
         emb = client.embeddings.create(
-            model="text-embedding-3-large",
+            model="text-embedding-3-small",
             input=resumen_texto.strip()
         ).data[0].embedding
         emb_np = np.array([emb], dtype="float32")
