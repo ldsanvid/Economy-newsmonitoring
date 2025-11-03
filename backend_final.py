@@ -509,7 +509,7 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
     """
     Si hay FAISS: busca en TODO el corpus y luego intersecta con df_base (filtros de fecha/entidades/sentimiento).
     Si no hay FAISS: hace TF-IDF sobre df_base.
-    Devuelve un DataFrame con las top coincidencias (máx 7).
+    Devuelve un DataFrame con las top coincidencias (máx 10).
     """
     q = query.strip()
     if not USE_FAISS:
@@ -517,7 +517,7 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
         X = tfidf.fit_transform(df_base["Título"])
         v = tfidf.transform([q])
         sims = cosine_similarity(v, X).flatten()
-        idx = sims.argsort()[-7:][::-1]
+        idx = sims.argsort()[-10:][::-1]   # ← cambiado a 10
         return df_base.iloc[idx]
 
     try:
@@ -530,9 +530,9 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
         candidatos = df_metadata.iloc[ids[0]].copy()
 
         # Intersección con df_base por campos clave
-        clave = ["Título","Fuente","Enlace"]
+        clave = ["Título", "Fuente", "Enlace"]
         mergeado = candidatos.merge(
-            df_base[clave + ["Fecha","Cobertura","Término","Sentimiento"]],
+            df_base[clave + ["Fecha", "Cobertura", "Término", "Sentimiento"]],
             on=clave, how="inner"
         )
 
@@ -541,10 +541,10 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
             X = tfidf.fit_transform(df_base["Título"])
             v = tfidf.transform([q])
             sims = cosine_similarity(v, X).flatten()
-            idx = sims.argsort()[-5:][::-1]
+            idx = sims.argsort()[-10:][::-1]   # ← cambiado a 10
             return df_base.iloc[idx]
 
-        orden = {t:i for i,t in enumerate(candidatos["Título"].tolist())}
+        orden = {t: i for i, t in enumerate(candidatos["Título"].tolist())}
         mergeado["__rank"] = mergeado["Título"].map(orden)
         mergeado = mergeado.sort_values("__rank").drop(columns="__rank")
         return mergeado.head(10)
@@ -554,8 +554,9 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
         X = tfidf.fit_transform(df_base["Título"])
         v = tfidf.transform([q])
         sims = cosine_similarity(v, X).flatten()
-        idx = sims.argsort()[-5:][::-1]
+        idx = sims.argsort()[-10:][::-1]   # ← cambiado a 10
         return df_base.iloc[idx[:10]]
+
 
 
 
@@ -1032,7 +1033,14 @@ def pregunta():
                 "titulares_usados": []
             })
 
-        top_noticias = resultados.head(7)
+        # 📰 4️⃣ Seleccionar hasta 10 titulares de fuentes distintas
+        resultados["Fuente"] = resultados["Fuente"].fillna("Fuente desconocida")
+
+        # Tomar primero los títulos únicos por fuente manteniendo el orden de relevancia
+        resultados_unicos = resultados.drop_duplicates(subset=["Fuente"], keep="first")
+
+        # Limitar a 10
+        top_noticias = resultados_unicos.head(10)
 
         # 🧩 5️⃣ Construcción del contexto
         contexto = "\n".join([
