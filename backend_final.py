@@ -794,14 +794,25 @@ Noticias no relacionadas con aranceles:
                 if not valores_previos.empty:
                     ultimo_valor = pd.to_numeric(valores_previos.iloc[-1], errors="coerce")
                     economia_dia[col] = f"{ultimo_valor*100:.2f}%" if pd.notnull(ultimo_valor) else ""
+        # 🔹 Inflación US: usar df_infl_us directo (igual que MEX) y tolerar "3.02%" o 0.0302
+        def _to_decimal_pct(v):
+            if pd.isna(v):
+                return None
+            try:
+                s = str(v).strip()
+                if s.endswith("%"):
+                    return float(s.replace("%", "").strip()) / 100.0
+                return float(s)
+            except:
+                return None
 
-        # 🔹 Inflación US: se queda leyendo de df_economia
         for col in ["Inflación Anual US", "Inflación Subyacente US"]:
-            if col in df_economia.columns:
-                valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
+            if col in df_infl_us.columns:
+                valores_previos = df_infl_us[df_infl_us["Fecha"] <= fecha_dt][col].dropna()
                 if not valores_previos.empty:
-                    ultimo_valor = pd.to_numeric(valores_previos.iloc[-1], errors="coerce")
-                    economia_dia[col] = f"{ultimo_valor*100:.2f}%" if pd.notnull(ultimo_valor) else ""
+                    ultimo_valor = _to_decimal_pct(valores_previos.iloc[-1])
+                    economia_dia[col] = f"{ultimo_valor*100:.2f}%" if ultimo_valor is not None else ""
+
 
 
 
@@ -917,7 +928,7 @@ Noticias no relacionadas con aranceles:
         # Guardar y subir
         df_total.to_csv(resumen_meta_path, index=False, encoding="utf-8")
         print(f"💾 Guardado local de resumenes_metadata.csv con {len(df_total)} fila(s) totales")
-        s3_upload("resumenes_metadata.csv")
+        r2_upload("resumenes_metadata.csv")
         print("☁️ Subido resumenes_metadata.csv a S3")
     except Exception as e:
         print(f"⚠️ No se pudo guardar/subir resumenes_metadata.csv: {e}")
@@ -952,8 +963,7 @@ Noticias no relacionadas con aranceles:
         print("💾 Guardado resumenes_index.faiss actualizado")
 
         # Subir a S3
-        from s3_utils import s3_upload
-        s3_upload("resumenes_index.faiss")
+        r2_upload("resumenes_index.faiss")
         print("☁️ Subido resumenes_index.faiss a S3")
 
     except Exception as e:
