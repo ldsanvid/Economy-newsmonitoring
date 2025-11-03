@@ -509,7 +509,7 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
     """
     Si hay FAISS: busca en TODO el corpus y luego intersecta con df_base (filtros de fecha/entidades/sentimiento).
     Si no hay FAISS: hace TF-IDF sobre df_base.
-    Devuelve un DataFrame con las top coincidencias (máx 5).
+    Devuelve un DataFrame con las top coincidencias (máx 7).
     """
     q = query.strip()
     if not USE_FAISS:
@@ -517,7 +517,7 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
         X = tfidf.fit_transform(df_base["Título"])
         v = tfidf.transform([q])
         sims = cosine_similarity(v, X).flatten()
-        idx = sims.argsort()[-5:][::-1]
+        idx = sims.argsort()[-7:][::-1]
         return df_base.iloc[idx]
 
     try:
@@ -1032,7 +1032,7 @@ def pregunta():
                 "titulares_usados": []
             })
 
-        top_noticias = resultados.head(10)
+        top_noticias = resultados.head(7)
 
         # 🧩 5️⃣ Construcción del contexto
         contexto = "\n".join([
@@ -1049,7 +1049,7 @@ No inventes datos; si la información no está presente, indícalo.
 
 Pregunta: {q}
 
-Titulares relevantes: (incluye hasta 10)
+Titulares relevantes: (incluye hasta 7)
 {contexto}
 
 Respuesta:
