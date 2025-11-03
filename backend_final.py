@@ -162,7 +162,6 @@ df_infl_mx = pd.read_excel(excel_path, sheet_name="InflaciónMEX").rename(column
 # ------------------------------
 # 🧠 Carga del índice FAISS (para búsqueda semántica) — con rutas absolutas y diagnóstico
 # ------------------------------
-import faiss
 
 USE_FAISS = True
 try:
@@ -192,6 +191,22 @@ try:
 except Exception as e:
     USE_FAISS = False
     print(f"⚠️ No se pudo cargar FAISS, se usará TF-IDF. Motivo: {e}")
+# 🧹 Utilidad para sanear JSON (convierte NaN/inf a None y numpy → tipos nativos)
+def _json_sanitize(x):
+    import math, numpy as np
+    if isinstance(x, dict):
+        return {k: _json_sanitize(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [ _json_sanitize(v) for v in x ]
+    if isinstance(x, (float, np.floating)):
+        if math.isnan(x) or math.isinf(x):
+            return None
+        return float(x)
+    if isinstance(x, (np.integer,)):
+        return int(x)
+    if isinstance(x, (np.bool_,)):
+        return bool(x)
+    return x
 
 
 # 🔄 Normalizar fechas para que todas las hojas tengan el mismo formato date
@@ -871,8 +886,6 @@ Noticias no relacionadas con aranceles:
     # 💾 Guardar resumen y subir a S3 (modo append con control de duplicados)
     # ------------------------------
     try:
-        from s3_utils import s3_upload
-
         os.makedirs("faiss_index", exist_ok=True)
         resumen_meta_path = "faiss_index/resumenes_metadata.csv"
 
@@ -887,17 +900,17 @@ Noticias no relacionadas con aranceles:
         # Si ya existe el archivo, lo leemos y agregamos (sin duplicar fechas)
         if os.path.exists(resumen_meta_path):
             df_prev = pd.read_csv(resumen_meta_path)
+        else:
+            # inicializa con el esquema correcto para evitar NameError
+            df_prev = pd.DataFrame(columns=["fecha","archivo_txt","nube","titulares","resumen"])
 
         if str(fecha_dt) not in df_prev["fecha"].astype(str).values:
             df_total = pd.concat([df_prev, df_resumen], ignore_index=True)
             print(f"🆕 Agregado nuevo resumen para {fecha_dt}")
         else:
             print(f"♻️ Reemplazando resumen existente para {fecha_dt}")
-
-            # Alinear columnas antes de reemplazar (previene el error)
+            # Alinear columnas y reemplazar fila coincidente
             df_resumen = df_resumen.reindex(columns=df_prev.columns)
-
-            # Reemplazar fila coincidente de forma segura
             df_prev.loc[df_prev["fecha"].astype(str) == str(fecha_dt), df_prev.columns] = df_resumen.values[0]
             df_total = df_prev
 
@@ -974,7 +987,7 @@ def resumen():
     import math
     resultado = {k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in resultado.items()} if isinstance(resultado, dict) else resultado
 
-    return jsonify(resultado)
+    return jsonify(_json_sanitize(resultado))
 
 def extraer_rango_fechas(pregunta):
     # Busca expresiones tipo "entre el 25 y el 29 de agosto"
