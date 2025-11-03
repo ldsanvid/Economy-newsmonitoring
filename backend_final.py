@@ -8,6 +8,7 @@ from datetime import datetime
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import dateparser
+from dateparser.search import search_dates
 import csv
 from wordcloud import WordCloud
 from flask import send_file
