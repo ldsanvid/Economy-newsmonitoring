@@ -520,7 +520,7 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
 
     try:
         emb_q = client.embeddings.create(
-            model="text-embedding-3-large", input=q
+            model="text-embedding-3-small", input=q
         ).data[0].embedding
 
         vq = np.array(emb_q, dtype="float32")[np.newaxis, :]
