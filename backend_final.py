@@ -520,7 +520,7 @@ def buscar_semantica_noticias(query, df_base, top_k=200):
 
     try:
         emb_q = client.embeddings.create(
-            model="text-embedding-3-small", input=q
+            model="text-embedding-3-large", input=q
         ).data[0].embedding
 
         vq = np.array(emb_q, dtype="float32")[np.newaxis, :]
@@ -911,7 +911,7 @@ Noticias no relacionadas con aranceles:
         
         # Generar embedding del resumen del día
         emb = client.embeddings.create(
-            model="text-embedding-3-small",
+            model="text-embedding-3-large",
             input=resumen_texto.strip()
         ).data[0].embedding
         emb_np = np.array([emb], dtype="float32")
@@ -999,7 +999,7 @@ def pregunta():
 
     # 🧩 2️⃣ Calcular embedding de la pregunta
     emb_q = client.embeddings.create(
-        model="text-embedding-3-small",
+        model="text-embedding-3-large",
         input=q
     ).data[0].embedding
     vq = np.array([emb_q], dtype="float32")
