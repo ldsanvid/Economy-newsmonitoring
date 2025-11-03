@@ -372,19 +372,22 @@ document.getElementById('btnPreguntar').addEventListener('click', async () => {
     // Mostrar respuesta textual
     document.getElementById('respuestaTexto').textContent = data.respuesta || '';
 
-    // Mostrar titulares con enlaces
-    if (data.titulares && data.titulares.length > 0) {
-      titularesPreguntaDiv.innerHTML = data.titulares
-        .map(t => `
-          <div class="chip">
-            🗞️ <a href="${t.enlace}" target="_blank">${t.titulo}</a>
-            <small>• ${t.medio}</small>
-          </div>
-        `)
-        .join('');
-    } else {
-      titularesPreguntaDiv.innerHTML = '<em>No hay titulares disponibles</em>';
-    }
+    // Mostrar titulares con enlaces (usa la clave correcta del backend)
+const titulares = data.titulares_usados || data.titulares || [];
+
+if (titulares.length > 0) {
+  titularesPreguntaDiv.innerHTML = titulares
+    .map(t => `
+      <div class="chip">
+        🗞️ <a href="${t.enlace}" target="_blank">${t.titulo}</a>
+        <small>• ${t.medio}</small>
+      </div>
+    `)
+    .join('');
+} else {
+  titularesPreguntaDiv.innerHTML = '<em>No hay titulares disponibles</em>';
+}
+
   } catch (err) {
     console.error(err);
     document.getElementById('respuestaTexto').textContent = '❌ Error al procesar la pregunta.';
