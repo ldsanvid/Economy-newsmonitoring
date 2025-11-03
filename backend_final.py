@@ -1044,12 +1044,12 @@ def pregunta():
         prompt = f"""{CONTEXTO_POLITICO}
 
 Responde la siguiente pregunta de forma clara, profesional y analítica,
-usando únicamente los titulares listados a continuación.
+usando únicamente los titulares listados a continuación. A menos de que la respuesta sea que no tienes información, contesta con un mínimo de 150 palabras..
 No inventes datos; si la información no está presente, indícalo.
 
 Pregunta: {q}
 
-Titulares relevantes:
+Titulares relevantes: (incluye hasta 10)
 {contexto}
 
 Respuesta:
