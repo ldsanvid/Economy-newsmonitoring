@@ -429,7 +429,7 @@ def extraer_entidades(texto):
         "Milei": ["presidente de argentina"],
         "Von Der Leyen": ["presidenta de la comisión europea"],
         "Petro": ["presidente de colombia"],
-        "Fed": ["Federal Reserve"],
+        "La fed": ["Federal Reserve"],
     }
     lugares_dict = {
         "Nuevo León": ["nl", "monterrey"],
@@ -986,134 +986,109 @@ def pregunta():
     data = request.get_json()
     q = data.get("pregunta", "").strip()
     if not q:
-        return jsonify({"respuesta": "No se proporcionó una pregunta."}), 400
+        return jsonify({"error": "No se proporcionó una pregunta válida."}), 400
 
-    # 🧩 1️⃣ Cargar índice FAISS y metadata
-    index_path = "faiss_index/noticias_index.faiss"
-    meta_path = "faiss_index/noticias_metadata.csv"
+    try:
+        # 🧠 1️⃣ Detectar fechas (una o rango)
+        fechas_detectadas = list(dateparser.search.search_dates(q, languages=['es', 'en']))
+        fecha_inicio = fecha_fin = None
 
-    if not os.path.exists(index_path) or not os.path.exists(meta_path):
-        return jsonify({"respuesta": "El índice FAISS o el archivo de metadatos no están disponibles."}), 500
+        if len(fechas_detectadas) == 1:
+            fecha_inicio = fecha_fin = fechas_detectadas[0][1].date()
+        elif len(fechas_detectadas) >= 2:
+            fecha_inicio = fechas_detectadas[0][1].date()
+            fecha_fin = fechas_detectadas[1][1].date()
 
-    df_meta = pd.read_csv(meta_path)
-    df_meta.dropna(subset=["Título"], inplace=True)
+        # 🧩 2️⃣ Detectar entidades clave
+        entidades = extraer_entidades(q)
 
-    # 🧩 2️⃣ Calcular embedding de la pregunta
-    emb_q = client.embeddings.create(
-        model="text-embedding-3-large",
-        input=q
-    ).data[0].embedding
-    vq = np.array([emb_q], dtype="float32")
+        # 🧩 3️⃣ Filtrado del DataFrame principal por fecha y entidades
+        df_filtrado = df.copy()
+        if fecha_inicio and fecha_fin:
+            df_filtrado = df_filtrado[
+                (pd.to_datetime(df_filtrado["Fecha"]).dt.date >= fecha_inicio)
+                & (pd.to_datetime(df_filtrado["Fecha"]).dt.date <= fecha_fin)
+            ]
+        elif fecha_inicio:
+            df_filtrado = df_filtrado[
+                pd.to_datetime(df_filtrado["Fecha"]).dt.date == fecha_inicio
+            ]
 
-    # 🧩 3️⃣ Buscar en FAISS (obtenemos los 200 más similares para refinar después)
-    index = faiss.read_index(index_path)
-    sims, ids = index.search(vq, 200)
-    top_raw = df_meta.iloc[ids[0]].copy()
-    top_raw["similitud"] = sims[0]
+        if not df_filtrado.empty:
+            df_filtrado = filtrar_titulares(df_filtrado, entidades, detectar_sentimiento_deseado(q))
 
-    # 🧩 4️⃣ Filtros ligeros automáticos (sin bloquear FAISS)
-    q_lower = q.lower()
-    if any(p in q_lower for p in ["positiv", "negativ", "neutral"]):
-        if "positiv" in q_lower:
-            top_raw = top_raw[top_raw["Sentimiento"] == "Positiva"]
-        elif "negativ" in q_lower:
-            top_raw = top_raw[top_raw["Sentimiento"] == "Negativa"]
-        elif "neutral" in q_lower:
-            top_raw = top_raw[top_raw["Sentimiento"] == "Neutral"]
+        if df_filtrado.empty:
+            return jsonify({
+                "respuesta": f"No encontré noticias relacionadas con tu pregunta: '{q}'.",
+                "titulares_usados": []
+            })
 
-    # 🧩 5️⃣ Detección simple de rango de fechas (si hay “del… al…” o “entre… y…”)
-    fecha_inicio, fecha_fin = extraer_rango_fechas(q)
-    if fecha_inicio and fecha_fin:
-        top_raw["Fecha"] = pd.to_datetime(top_raw["Fecha"], errors="coerce")
-        top_raw = top_raw[
-            (top_raw["Fecha"].dt.date >= fecha_inicio)
-            & (top_raw["Fecha"].dt.date <= fecha_fin)
-        ]
+        # 🧠 4️⃣ Búsqueda semántica con FAISS (o TF-IDF fallback)
+        resultados = buscar_semantica_noticias(q, df_filtrado, top_k=200)
+        if resultados.empty:
+            return jsonify({
+                "respuesta": f"No encontré coincidencias semánticas para '{q}'.",
+                "titulares_usados": []
+            })
 
-    # 🧩 6️⃣ Reordenar y tomar los 10 más relevantes finales
-    top_final = top_raw.sort_values("similitud", ascending=False).head(5)
+        top_noticias = resultados.head(10)
 
-    # 🧠 6B️⃣ Buscar también en FAISS de resúmenes, si existe
-    resumen_index_path = "faiss_index/resumenes_index.faiss"
-    resumen_meta_path = "faiss_index/resumenes_metadata.csv"
+        # 🧩 5️⃣ Construcción del contexto
+        contexto = "\n".join([
+            f"- {row['Título']} ({row['Fuente']})"
+            for _, row in top_noticias.iterrows()
+        ])
 
-    contexto_resumenes = ""
-    if os.path.exists(resumen_index_path) and os.path.exists(resumen_meta_path):
-        try:
-            df_resumenes = pd.read_csv(resumen_meta_path)
-            index_resumenes = faiss.read_index(resumen_index_path)
+        # 🧠 6️⃣ Prompt para GPT
+        prompt = f"""{CONTEXTO_POLITICO}
 
-            # Reutilizamos el embedding ya generado (emb_q)
-            vq = np.array([emb_q], dtype="float32")
-
-            sims_r, ids_r = index_resumenes.search(vq, 3)  # top 3 resúmenes más similares
-            top_resumenes = df_resumenes.iloc[ids_r[0]].copy()
-
-            contexto_resumenes = "\n\n".join([
-                f"📅 {row['fecha']}: {row['resumen'][:500]}..."  # limitamos texto para no saturar tokens
-                for _, row in top_resumenes.iterrows()
-            ])
-            print(f"🧠 Se añadieron {len(top_resumenes)} resúmenes relevantes al contexto.")
-        except Exception as e:
-            print(f"⚠️ No se pudo consultar FAISS de resúmenes: {e}")
-
-
-    # 🧩 7️⃣ Construir contexto para GPT (trazabilidad total)
-    contexto = "\n".join([
-        f"- {row['Título']} ({row['Fuente']}, {row['Fecha']})" for _, row in top_final.iterrows()
-    ])
-
-    prompt = f"""{CONTEXTO_POLITICO}
-
-Responde la siguiente pregunta de forma clara, profesional y analítica.
-Usa **únicamente** la información proporcionada: los titulares listados y, si existen, los resúmenes previos.
-No inventes datos, y redacta una respuesta de entre 150 y 200 palabras en tono ejecutivo.
+Responde la siguiente pregunta de forma clara, profesional y analítica,
+usando únicamente los titulares listados a continuación.
+No inventes datos; si la información no está presente, indícalo.
 
 Pregunta: {q}
 
-📚 Resúmenes previos relevantes (si los hay):
-{contexto_resumenes if contexto_resumenes else "Ninguno"}
-
-🗞️ Titulares relevantes (máx. 5):
+Titulares relevantes:
 {contexto}
 
 Respuesta:
 """
 
+        # 🧩 7️⃣ Llamada a OpenAI
+        respuesta = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Eres un analista de medios experto en política y economía. Responde solo con base en los titulares dados."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.25,
+            max_tokens=700
+        )
 
-    # 🧩 8️⃣ Llamada a OpenAI
-    respuesta = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Eres un analista de medios experto en política y economía. Responde solo con base en los titulares dados."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.25,
-        max_tokens=700
-    )
+        texto_respuesta = respuesta.choices[0].message.content.strip()
 
-    texto_respuesta = respuesta.choices[0].message.content.strip()
+        titulares_usados = [
+            {
+                "titulo": row["Título"],
+                "medio": row["Fuente"],
+                "fecha": str(row["Fecha"]),
+                "enlace": row["Enlace"]
+            }
+            for _, row in top_noticias.iterrows()
+        ]
 
-    # 🧩 9️⃣ Construir salida con trazabilidad completa
-    titulares_info = [
-        {
-            "titulo": row["Título"],
-            "medio": row["Fuente"],
-            "fecha": str(row["Fecha"]),
-            "enlace": row["Enlace"]
-        }
-        for _, row in top_final.iterrows()
-    ]
+        return jsonify({
+            "respuesta": texto_respuesta,
+            "titulares_usados": titulares_usados,
+            "filtros": {
+                "entidades": entidades,
+                "rango": [str(fecha_inicio), str(fecha_fin)] if fecha_inicio else None
+            }
+        })
 
-    return jsonify({
-        "respuesta": texto_respuesta,
-        "titulares_usados": titulares_info,
-        "n_total_encontrados": len(top_raw),
-        "n_usados": len(top_final)
-    })
-
-
-
+    except Exception as e:
+        print(f"❌ Error en /pregunta: {e}")
+        return jsonify({"error": str(e)}), 500
 
 #correoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 @app.route("/enviar_email", methods=["POST"])
