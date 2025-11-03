@@ -1031,7 +1031,7 @@ def pregunta():
         ]
 
     # 🧩 6️⃣ Reordenar y tomar los 10 más relevantes finales
-    top_final = top_raw.sort_values("similitud", ascending=False).head(10)
+    top_final = top_raw.sort_values("similitud", ascending=False).head(7)
 
     # 🧠 6B️⃣ Buscar también en FAISS de resúmenes, si existe
     resumen_index_path = "faiss_index/resumenes_index.faiss"
@@ -1074,7 +1074,7 @@ Pregunta: {q}
 📚 Resúmenes previos relevantes (si los hay):
 {contexto_resumenes if contexto_resumenes else "Ninguno"}
 
-🗞️ Titulares relevantes (máx. 10):
+🗞️ Titulares relevantes (máx. 7):
 {contexto}
 
 Respuesta:
