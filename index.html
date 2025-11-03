@@ -333,7 +333,7 @@ function renderIndicadores(orden, economia) {
         body: JSON.stringify({ fecha })
       });
       const data = await r.json();
-      resumenTexto.textContent = data.resumen || '';
+      resumenTexto.innerHTML = (data.resumen || '').replace(/\n/g, '<br>');
       if (data.nube_url) {
         nubeWrap.innerHTML = `<img src="${API_BASE}${data.nube_url}?t=${Date.now()}" style="width:100%;border-radius:14px;border:1px solid var(--border)">`;
       }
