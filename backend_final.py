@@ -958,7 +958,9 @@ Noticias no relacionadas con aranceles:
 
 @app.route("/resumen", methods=["POST"])
 def resumen():
+    print("🛰️ Solicitud recibida en /resumen")
     data = request.get_json()
+    print(f"📩 JSON recibido: {data}")
     fecha_str = data.get("fecha")
     if not fecha_str:
         return jsonify({"error": "Debe especificar una fecha"}), 400
