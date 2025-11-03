@@ -1036,6 +1036,13 @@ def pregunta():
         # 📰 4️⃣ Seleccionar hasta 10 titulares de fuentes distintas
         resultados["Fuente"] = resultados["Fuente"].fillna("Fuente desconocida")
 
+        # 🌍 Incluir noticias tanto en español como en inglés
+        if "Idioma" in resultados.columns:
+            resultados["Idioma"] = resultados["Idioma"].fillna("").str.lower().str.strip()
+            # Conserva noticias en español o inglés
+            resultados = resultados[resultados["Idioma"].isin(["es", "en", "español", "ingles", "inglés"])]
+
+
         # Tomar primero los títulos únicos por fuente manteniendo el orden de relevancia
         resultados_unicos = resultados.drop_duplicates(subset=["Fuente"], keep="first")
 
@@ -1051,13 +1058,16 @@ def pregunta():
         # 🧠 6️⃣ Prompt para GPT
         prompt = f"""{CONTEXTO_POLITICO}
 
-Responde la siguiente pregunta de forma clara, profesional y analítica,
-usando únicamente los titulares listados a continuación. A menos de que la respuesta sea que no tienes información, contesta con un mínimo de 150 palabras..
+Responde en español, de forma clara, profesional y analítica,
+usando únicamente los titulares listados a continuación (en español o en inglés). 
+Si hay titulares en inglés, traduce y sintetiza su contenido. 
+A menos de que la respuesta sea que no tienes información, contesta con un mínimo de 150 palabras.
 No inventes datos; si la información no está presente, indícalo.
+
 
 Pregunta: {q}
 
-Titulares relevantes: (incluye hasta 7)
+Titulares relevantes: (incluye hasta 10)
 {contexto}
 
 Respuesta:
