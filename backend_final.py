@@ -970,6 +970,10 @@ def resumen():
     if "error" in resultado:
         return jsonify(resultado), 404
 
+    # 🧹 Evitar NaN en la respuesta
+    import math
+    resultado = {k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in resultado.items()} if isinstance(resultado, dict) else resultado
+
     return jsonify(resultado)
 
 def extraer_rango_fechas(pregunta):
