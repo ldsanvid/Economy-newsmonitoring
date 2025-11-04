@@ -716,8 +716,10 @@ def generar_resumen_y_datos(fecha_str):
 
     IMPORTANTE:
 - Prioriza la información de las noticias del {fecha_str} por encima de resúmenes previos.
+- No repitas noticias individuales, es decir, más allá del tema que sea tendencia, las noticias indivduales que se presentan un día, no se deben repetir en {fecha_str}.
 - Solo menciona lo de días previos si es una noticia muy repetida en {fecha_str}-
-- Si una noticia continúa temas de días anteriores, menciona brevemente la conexión, pero evita repetir frases o estructuras previas.
+- Si una noticia continúa temas de días anteriores, menciona brevemente la conexión, pero evita repetir frases o estructuras previas
+- Si la noticia general continúa varios días seguidos, empieza con "vuelve a ser" o "continúa siendo".
 - Reformula el estilo narrativo: usa conectores distintos, cambios léxicos y nuevas perspectivas.
 - Enfócate en los hechos y declaraciones nuevos.
 - NO copies frases ni estructuras de los resúmenes anteriores.
