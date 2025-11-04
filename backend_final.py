@@ -143,7 +143,11 @@ df_tasas = pd.read_excel(excel_path, sheet_name="Tasas de interés")
 df_tasas_us = pd.read_excel(excel_path, sheet_name="Tasas de interés US2")
 
 df_economia = df_tipo_cambio.merge(df_tasas, on=["Año", "Fecha"], how="outer")
-df_economia = df_economia.merge(df_tasas_us, on=["Año", "Fecha"], how="outer").fillna("")
+df_economia = df_economia.merge(df_tasas_us, on=["Año", "Fecha"], how="outer")
+
+# 🔧 Limpiar valores vacíos: convertir cadenas vacías en NaN
+df_economia.replace("", np.nan, inplace=True)
+
 
 # Cargar hojas adicionales
 df_sofr = pd.read_excel(excel_path, sheet_name="Treasuries_SOFR")
@@ -230,6 +234,9 @@ df_economia = df_economia.merge(df_wall[["Fecha", "% Dow Jones", "% S&P500", "% 
 # 🔄 Normalizar Fecha de df_economia después de todos los merges
 df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
 df_economia = df_economia.sort_values("Fecha")
+# 🔧 Asegurar que todas las columnas tengan NaN en lugar de cadenas vacías
+df_economia.replace("", np.nan, inplace=True)
+
 
 
 categorias_dict = {
@@ -772,12 +779,14 @@ Noticias no relacionadas con aranceles:
         economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
     # 🧩 Fallback adicional a nivel columna: usar último valor válido anterior
     for col in ORDEN_COLUMNAS:
-        if col in economia_dia.columns and (
-            economia_dia.iloc[0][col] in ["", None, np.nan] or pd.isna(economia_dia.iloc[0][col])
-        ):
-            valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
-            if not valores_previos.empty:
-                economia_dia.loc[economia_dia.index[0], col] = valores_previos.iloc[-1]
+        if col in economia_dia.columns:
+            val = economia_dia.iloc[0][col]
+            # Detectar valores vacíos, NaN o 'nan' como texto
+            if pd.isna(val) or str(val).strip().lower() in ["", "nan", "none"]:
+                valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
+                if not valores_previos.empty:
+                    economia_dia.loc[economia_dia.index[0], col] = valores_previos.iloc[-1]
+
 
 
     print(f"📅 Fecha económica usada: {economia_dia['Fecha'].iloc[0] if not economia_dia.empty else 'Sin datos'}")
@@ -1205,12 +1214,6 @@ def enviar_email():
         ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
         if pd.notnull(ultima_fecha):
             economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
-    # 🧩 Fallback adicional a nivel columna: usar último valor válido anterior
-    for col in ORDEN_COLUMNAS:
-        if col in economia_dia.columns and (economia_dia.iloc[0][col] in ["", None, np.nan] or pd.isna(economia_dia.iloc[0][col])):
-            valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
-            if not valores_previos.empty:
-                economia_dia.loc[economia_dia.index[0], col] = valores_previos.iloc[-1]
 
     # Si sigue vacío (p. ej., todos los datos son posteriores), usar la más reciente disponible
     if economia_dia.empty and not df_economia.empty:
