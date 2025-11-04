@@ -691,7 +691,7 @@ def generar_resumen_y_datos(fecha_str):
 
             if len(df_prev) > 0:
                 # Tomar los últimos 5 resúmenes (o menos si hay menos registros)
-                ultimos = df_prev.tail(5)
+                ultimos = df_prev.tail(10)
                 contexto_texto = "\n\n".join(
                     [f"({row['fecha']}) {row['resumen'].strip()}" for _, row in ultimos.iterrows()]
                 )
@@ -711,11 +711,11 @@ def generar_resumen_y_datos(fecha_str):
 
     {CONTEXTO_POLITICO}
 
-Redacta un resumen de noticias del {fecha_str} dividido en cinco párrafos. Tono profesional, objetivo y dirigido a tomadores de decisiones. De 400 palabras. Antes de empezar a redactar, revisa {CONTEXTO_ANTERIOR}, si existe. Utilízalo para darle continuidad narrativa. Si en el resumen anterior se presenta x noticia y en las noticias del nuevo día se vuelve a hacer mención de la misma, retómalo para únicamente contar lo que es nuevo (ya sea nuevos desarrollos, nuevas reacciones) pero sin volver a contarlo como si fuera la primera vez. 
+Redacta un resumen de noticias del {fecha_str} dividido en cinco párrafos. Tono profesional, objetivo y dirigido a tomadores de decisiones. De 400 palabras. Antes de empezar a redactar, revisa {CONTEXTO_ANTERIOR}, si existe. Utilízalo para darle continuidad narrativa. Si en el resumen anterior se presenta x noticia y en las noticias del nuevo día se vuelve a hacer mención de la misma, retómalo para únicamente contar lo que es nuevo (ya sea nuevos desarrollos, nuevas reacciones) pero sin volver a contarlo como si fuera la primera vez. Si es una noticia repetida, menciona algo como "la noticia principal vuelve a ser...". 
 
 Luego de hacer esa revisión y considerarla antes de empezar a redactar:
 
-Primer párrafo: Describe y contextualiza el tema más repetido del día (qué, quién, cómo). Si esta noticia ya fue mencionada en días previos, menciona que es una continuación o extensión de una noticia ya ocurrida y no repitas los mismos detalles, es decir, da información nueva. En caso de que sea una noticia nueva, sin dar tu punto de vista, quiero que presentes todo lo que encontraste sobre ese tema (declaraciones de diversos actores u organismos, por ejemplo, para mostrar todas las versiones).
+Primer párrafo: Describe y contextualiza el tema más repetido del día (qué, quién, cómo). Si esta noticia ya fue mencionada en días previos, menciona que es una continuación o extensión de una noticia ya ocurrida y no repitas los mismos detalles, es decir, da información nueva . REPITO, NO REPITAS NOTICIAS. En caso de que sea una noticia nueva, sin dar tu punto de vista, quiero que presentes todo lo que encontraste sobre ese tema (declaraciones de diversos actores u organismos, por ejemplo, para mostrar todas las versiones).
 
 Segundo párrafo: Sin repetir la noticia sobre la que te enfocaste en el primer párrafo, en este párrafo quiero que resumas las noticias, tanto de cobertura nacional como internacional, que sean sobre aranceles, tasas de interés, acuerdo comercial, banco central y reserva federal. Permítete hacer este párrafo más extenso que el resto si es necesario. Si esta noticia ya fue mencionada en días previos, menciona que es una continuación o extensión de una noticia ya ocurrida y no repitas los mismos detalles, es decir, da información nueva
 
