@@ -375,6 +375,9 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - Cuando una noticia viene en inglés y hablan de "EU", se refierne a la Unión Europea.
 - Cuando una noticia viene en español y hablan de EU, se refiere a Estados Unidos.
 - PROFEPA es la Procuraduría Federal de Protección al Ambiente de México.
+- La ANPACT es la Asociación Nacional de Productores de Autobuses, Camiones y Tractocamiones.
+- El INVEA es Instituto de Verificación Administrativa de la Ciudad de México.
+- CBRE es una empresa de real estate que significa Coldwell Banker Richard Ellis.
 """
 
 def extraer_fechas(pregunta):
@@ -750,16 +753,26 @@ Noticias no relacionadas con aranceles:
     archivo_nube_path = os.path.join("nubes", archivo_nube)
     generar_nube(noticias_dia["Título"].tolist(), archivo_nube_path)
 
-    # 📊 Indicadores económicos
+
+    # 📊 Buscar datos económicos más recientes disponibles
     df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
 
-    # Filtrar datos económicos por fecha
+    # Intentar primero la fecha exacta
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt]
 
-    # Si no hay datos exactos, usar el más reciente antes de esa fecha
+    # Si no hay datos para ese día, usar la fecha más cercana anterior
     if economia_dia.empty:
         ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
+        if pd.notnull(ultima_fecha):
+            economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
+
+    # Si sigue vacío (p. ej., todos los datos son posteriores), usar la más reciente disponible
+    if economia_dia.empty and not df_economia.empty:
+        ultima_fecha = df_economia["Fecha"].max()
         economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
+
+    print(f"📅 Fecha económica usada: {economia_dia['Fecha'].iloc[0] if not economia_dia.empty else 'Sin datos'}")
+
 
     if economia_dia.empty:
         economia_dict = {}
@@ -1172,15 +1185,25 @@ def enviar_email():
 
         # 📊 Indicadores económicos
     # 📊 Indicadores económicos
+# 📊 Buscar datos económicos más recientes disponibles
     df_economia["Fecha"] = pd.to_datetime(df_economia["Fecha"], errors="coerce").dt.date
 
-    # Filtrar datos económicos por fecha
+    # Intentar primero la fecha exacta
     economia_dia = df_economia[df_economia["Fecha"] == fecha_dt]
 
-    # Si no hay datos exactos, usar el más reciente antes de esa fecha
+    # Si no hay datos para ese día, usar la fecha más cercana anterior
     if economia_dia.empty:
         ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
+        if pd.notnull(ultima_fecha):
+            economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
+
+    # Si sigue vacío (p. ej., todos los datos son posteriores), usar la más reciente disponible
+    if economia_dia.empty and not df_economia.empty:
+        ultima_fecha = df_economia["Fecha"].max()
         economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
+
+    print(f"📅 Fecha económica usada para correo: {economia_dia['Fecha'].iloc[0] if not economia_dia.empty else 'Sin datos'}")
+
 
     if not economia_dia.empty:
         economia_dia = economia_dia.copy()
