@@ -770,6 +770,15 @@ Noticias no relacionadas con aranceles:
     if economia_dia.empty and not df_economia.empty:
         ultima_fecha = df_economia["Fecha"].max()
         economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
+    # 🧩 Fallback adicional a nivel columna: usar último valor válido anterior
+    for col in ORDEN_COLUMNAS:
+        if col in economia_dia.columns and (
+            economia_dia.iloc[0][col] in ["", None, np.nan] or pd.isna(economia_dia.iloc[0][col])
+        ):
+            valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
+            if not valores_previos.empty:
+                economia_dia.loc[economia_dia.index[0], col] = valores_previos.iloc[-1]
+
 
     print(f"📅 Fecha económica usada: {economia_dia['Fecha'].iloc[0] if not economia_dia.empty else 'Sin datos'}")
 
@@ -1196,11 +1205,28 @@ def enviar_email():
         ultima_fecha = df_economia[df_economia["Fecha"] <= fecha_dt]["Fecha"].max()
         if pd.notnull(ultima_fecha):
             economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
+    # 🧩 Fallback adicional a nivel columna: usar último valor válido anterior
+    for col in ORDEN_COLUMNAS:
+        if col in economia_dia.columns and (economia_dia.iloc[0][col] in ["", None, np.nan] or pd.isna(economia_dia.iloc[0][col])):
+            valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
+            if not valores_previos.empty:
+                economia_dia.loc[economia_dia.index[0], col] = valores_previos.iloc[-1]
 
     # Si sigue vacío (p. ej., todos los datos son posteriores), usar la más reciente disponible
     if economia_dia.empty and not df_economia.empty:
         ultima_fecha = df_economia["Fecha"].max()
         economia_dia = df_economia[df_economia["Fecha"] == ultima_fecha]
+
+    # 🧩 Fallback adicional a nivel columna: usar último valor válido anterior
+    import numpy as np
+    for col in ORDEN_COLUMNAS:
+        if col in economia_dia.columns and (
+            economia_dia.iloc[0][col] in ["", None, np.nan] or pd.isna(economia_dia.iloc[0][col])
+        ):
+            valores_previos = df_economia[df_economia["Fecha"] <= fecha_dt][col].dropna()
+            if not valores_previos.empty:
+                economia_dia.loc[economia_dia.index[0], col] = valores_previos.iloc[-1]
+
 
     print(f"📅 Fecha económica usada para correo: {economia_dia['Fecha'].iloc[0] if not economia_dia.empty else 'Sin datos'}")
 
