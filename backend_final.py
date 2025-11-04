@@ -691,7 +691,7 @@ def generar_resumen_y_datos(fecha_str):
 
             if len(df_prev) > 0:
                 # Tomar los últimos 5 resúmenes (o menos si hay menos registros)
-                ultimos = df_prev.tail(10)
+                ultimos = df_prev.tail(3)
                 contexto_texto = "\n\n".join(
                     [f"({row['fecha']}) {row['resumen'].strip()}" for _, row in ultimos.iterrows()]
                 )
@@ -710,18 +710,24 @@ def generar_resumen_y_datos(fecha_str):
     {CONTEXTO_ANTERIOR}
 
     {CONTEXTO_POLITICO}
+    Redacta un resumen de noticias del {fecha_str} dividido en cinco párrafos.
+    Tono profesional, objetivo y dirigido a tomadores de decisiones.
+    Debe tener entre 250 y 400 palabras, dependiendo de la cantidad de noticias.
 
-Redacta un resumen de noticias del {fecha_str} dividido en cinco párrafos. Tono profesional, objetivo y dirigido a tomadores de decisiones. De 400 palabras. Antes de empezar a redactar, revisa {CONTEXTO_ANTERIOR}, si existe. Utilízalo para darle continuidad narrativa. Si en el resumen anterior se presenta x noticia y en las noticias del nuevo día se vuelve a hacer mención de la misma, retómalo para únicamente contar lo que es nuevo (ya sea nuevos desarrollos, nuevas reacciones) pero sin volver a contarlo como si fuera la primera vez. Si es una noticia repetida, menciona algo como "la noticia principal vuelve a ser...". 
+    IMPORTANTE:
+- Prioriza la información de las noticias del {fecha_str} por encima de resúmenes previos.
+- Solo menciona lo de días previos si es una noticia muy repetida en {fecha_str}-
+- Si una noticia continúa temas de días anteriores, menciona brevemente la conexión, pero evita repetir frases o estructuras previas.
+- Reformula el estilo narrativo: usa conectores distintos, cambios léxicos y nuevas perspectivas.
+- Enfócate en los hechos y declaraciones nuevos.
+- NO copies frases ni estructuras de los resúmenes anteriores.
 
-Luego de hacer esa revisión y considerarla antes de empezar a redactar:
-
-Primer párrafo: Describe y contextualiza el tema más repetido del día (qué, quién, cómo). Si esta noticia ya fue mencionada en días previos en {CONTEXTO_ANTERIOR}, menciona que es una continuación o extensión de una noticia ya ocurrida y no repitas los mismos detalles, es decir, da información nueva . REPITO, NO REPITAS NOTICIAS. En caso de que sea una noticia nueva, sin dar tu punto de vista, quiero que presentes todo lo que encontraste sobre ese tema (declaraciones de diversos actores u organismos, por ejemplo, para mostrar todas las versiones).
-
-Segundo párrafo: Sin repetir la noticia sobre la que te enfocaste en el primer párrafo, en este párrafo quiero que resumas las noticias, tanto de cobertura nacional como internacional, que sean sobre aranceles, tasas de interés, acuerdo comercial, banco central y reserva federal. Si esta noticia ya fue mencionada en días previos en {CONTEXTO_ANTERIOR}, menciona que es una continuación o extensión de una noticia ya ocurrida y no repitas los mismos detalles, es decir, da información nueva . REPITO, NO REPITAS NOTICIAS. En caso de que sea una noticia nueva. Permítete hacer este párrafo más extenso que el resto si es necesario. 
-
-Tercer párrafo: Resume brevemente las noticias que son de cobertura de algún estado de México (locales), excluyendo aquellas de cobertura nacional o internacional SIN REPETIR NOTICIAS DE LOS PÁRRAFOS O DÍAS PREVIOS. Si esta noticia ya fue mencionada en días previos en {CONTEXTO_ANTERIOR}, menciona que es una continuación o extensión de una noticia ya ocurrida y no repitas los mismos detalles, es decir, da información nueva . REPITO, NO REPITAS NOTICIAS. Menciona el estado o ciudad de cobertura de cada noticia. No repitas noticias mencionadas en los párrafos anteriores ni inventes cosas. Reserva todo lo relativo a fibras, naves industriales, parques industriales, hub logístico, hub industrial, real estate industrial, sector industrial o sector mobiliario industrial para el último párrafo. Usa este párrafo para cubrir noticias relacionadas con industria automotriz, transporte, construcción, fusiones y cadenas de suministro.
-
-Cuarto párrafo: Por último, resume de forma general las noticias que tienen que ver con fibras, naves industriales, parques industriales, hub logístico, hub industrial, real estate industrial, sector industrial o sector mobiliario industrial SIN REPETIR ALGUNA NOTICIAS MENCIONADA EN PÁRRAFOS O DÍAS PREVIOS. Si esta noticia ya fue mencionada en días previos en {CONTEXTO_ANTERIOR}, menciona que es una continuación o extensión de una noticia ya ocurrida y no repitas los mismos detalles, es decir, da información nueva . REPITO, NO REPITAS NOTICIAS. Recuerda, temas no arancelarios. Empieza diciendo "finalmente en otros temas económicos", sin recalcar de que se trata de noticias del ámbito local o nacional.
+Estructura:
+1️⃣ Primer párrafo: Tema más relevante del día (qué, quién, cómo).
+2️⃣ Segundo: Aranceles, tasas, acuerdos, bancos centrales, comercio exterior.
+3️⃣ Tercer: Noticias locales (estados, municipios, construcción, transporte, industria automotriz).
+4️⃣ Cuarto: Fibras, naves industriales, parques industriales, real estate, sector industrial.
+5️⃣ Quinto (opcional): panorama internacional si hay información adicional.
 
 Noticias nacionales:
 {contexto_nacional}
