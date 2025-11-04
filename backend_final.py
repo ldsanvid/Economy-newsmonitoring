@@ -373,6 +373,7 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - La OCDE (OECD por sus siglas en inglés) es la Organización para la Cooperación y el Desarrollo Económico . 
 - El ECB es el European Central Bank o Banco Europeo Central.
 - Cuando una noticia viene en inglés y hablan de "EU", se refierne a la Unión Europea.
+- Cuando una noticia viene en español y hablan de EU, se refiere a Estados Unidos.
 - PROFEPA es la Procuraduría Federal de Protección al Ambiente de México.
 """
 
@@ -905,7 +906,7 @@ Noticias no relacionadas con aranceles:
             "archivo_txt": f"resumen_{fecha_str}.txt",
             "nube": archivo_nube,
             "titulares": len(titulares_info),
-            "resumen": resumen_texto.strip().replace("\n", " ")
+            "resumen": resumen_texto.strip()
         }])
 
         # Si ya existe el archivo, lo leemos y agregamos (sin duplicar fechas)
@@ -1156,6 +1157,9 @@ def enviar_email():
     titulares_info = resultado.get("titulares", [])
     titulares_info_en = resultado.get("titulares_en", [])
     resumen_texto = resultado.get("resumen", "")
+        # 🔹 Convertir saltos de línea en HTML para conservar párrafos en el correo
+    resumen_html = (resumen_texto or "").replace("\n\n", "<br><br>").replace("\n", "<br>")
+
 
     if not resumen_texto:
         archivo_resumen = os.path.join("resumenes", f"resumen_{fecha_str}.txt")
@@ -1274,12 +1278,22 @@ def enviar_email():
         <td style="background:#fff; padding:16px 20px; border-bottom:2px solid #e5e7eb;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
             <tr>
-            <td align="left">
-                <img src="cid:logo" alt="Cliente" style="height:40px;">
-            </td>
-            <td align="right" style="font-weight:700; font-size:1.2rem; color:#111;">
-                Monitoreo<span style="color:#FFB429;">+</span>
-            </td>
+                <td align="left" style="vertical-align:middle;">
+                   <img src="cid:logo"
+                        alt="Industrial Gate"
+                        width="180"
+                        style="
+                            display:block;
+                            margin:0 auto;
+                            width:180px;
+                            max-width:180px;
+                            height:auto;
+                            -ms-interpolation-mode:bicubic;
+                        "> 
+                </td>
+                <td align="right" style="font-weight:700; font-size:1.2rem; color:#111;">
+                    Monitoreo<span style="color:#FFB429;">+</span>
+                </td>
             </tr>
         </table>
         </td>
@@ -1294,7 +1308,7 @@ def enviar_email():
             📅 Resumen diario de noticias — {fecha_str}
         </h2>
         <div style="background:#fff; border:1px solid #ddd; border-radius:12px; padding:20px; margin-bottom:20px;">
-            <p style="color:#555; line-height:1.7; text-align:justify;">{resumen_texto}</p>
+            <p style="color:#555; line-height:1.7; text-align:justify;">{resumen_html}</p>
         </div>
 
         <!-- Indicadores -->
