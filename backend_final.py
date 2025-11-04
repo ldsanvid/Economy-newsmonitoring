@@ -736,9 +736,12 @@ Noticias no relacionadas con aranceles:
 {contexto_otros_temas}
     """
  # --- Resumen GPT o cache ---
-    resumen_file = f"resumen_{fecha_str}.txt"
-    if os.path.exists(resumen_file):
-        with open(resumen_file, "r", encoding="utf-8") as f:
+# 💾 Guardar y reutilizar resumen desde carpeta "resumenes"
+    os.makedirs("resumenes", exist_ok=True)
+    archivo_resumen = os.path.join("resumenes", f"resumen_{fecha_str}.txt")
+
+    if os.path.exists(archivo_resumen):
+        with open(archivo_resumen, "r", encoding="utf-8") as f:
             resumen_texto = f.read()
     else:
         respuesta = client.chat.completions.create(
@@ -751,8 +754,9 @@ Noticias no relacionadas con aranceles:
             max_tokens=700
         )
         resumen_texto = respuesta.choices[0].message.content
-        with open(resumen_file, "w", encoding="utf-8") as f:
+        with open(archivo_resumen, "w", encoding="utf-8") as f:
             f.write(resumen_texto)
+
 
     # --- Generar nube ---
     os.makedirs("nubes", exist_ok=True)
