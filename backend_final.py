@@ -691,7 +691,7 @@ def generar_resumen_y_datos(fecha_str):
 
             if len(df_prev) > 0:
                 # Tomar los últimos 5 resúmenes (o menos si hay menos registros)
-                ultimos = df_prev.tail(3)
+                ultimos = df_prev.tail(1)
                 contexto_texto = "\n\n".join(
                     [f"({row['fecha']}) {row['resumen'].strip()}" for _, row in ultimos.iterrows()]
                 )
