@@ -5,6 +5,9 @@ on:
     - cron: "0 1 * * *"   # HOY 19:00 CDMX (01:00 UTC)
   workflow_dispatch:
 
+permissions:
+  contents: write   # 👈 ESTA LÍNEA ES CLAVE PARA PERMITIR EL PUSH
+
 jobs:
   ejecutar:
     runs-on: ubuntu-latest
@@ -45,4 +48,3 @@ jobs:
           git add csv_generados/*.csv || true
           git commit -m "🗞️ Actualización automática de noticias $(date '+%Y-%m-%d')" || echo "Sin cambios detectados"
           git push
-
