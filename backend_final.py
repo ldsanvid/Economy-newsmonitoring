@@ -387,7 +387,8 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - CBRE es una empresa de real estate que significa Coldwell Banker Richard Ellis.
 - John Roberts es el Presidente de la Suprema Corte de Estados Unidos.
 - Hugo Aguilar Ortíz es el Presidente de la Suprema Corte de México.
-- El fentanilo es una droga ilegal consumida en Estados Unidos y producida por México y por China. Estados Unidos ha ejercido significativa presión para que ambos países usen la fuerza del estado para detener a los grupos que lo producen así como limitar la propagación de precursores usados en su producción.
+- El fentanilo es una droga ilegal consumida en Estados Unidos y producida por México y por China. Estados Unidos ha ejercido significativa presión para que ambos países usen la fuerza del estado para detener a los grupos que lo producen, su contrabando a Estados Unidos, así como limitar la propagación de precursores usados en su producción.
+- El fentanilo NO ES UN BIEN QUE SE IMPORTA, SINO QUE ES FRUTO DEL CONTRABANDO. Dentro de sus negociaciones con China, Estados Unidos está poniendo la limitación del contrbando de esta droga hacia Estados Unidos como condición para China, que es un país productor (no oficialmente, sino por grupos ilegales). Pero al fentanilo no se le pone arancel.
 """
 
 def extraer_fechas(pregunta):
