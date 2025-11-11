@@ -763,7 +763,65 @@ Noticias no relacionadas con aranceles:
         resumen_texto = respuesta.choices[0].message.content
         with open(archivo_resumen, "w", encoding="utf-8") as f:
             f.write(resumen_texto)
+# 🔍 Detectar qué titulares (en español o inglés) aparecen mencionados en el resumen
+    def limpiar(texto):
+        return re.sub(r"[^a-zA-ZáéíóúñÁÉÍÓÚüÜ0-9 ]", "", texto.lower())
 
+    resumen_limpio = limpiar(resumen_texto)
+    titulares_relacionados = []
+    titulares_relacionados_en = []
+
+    for _, row in noticias_dia.iterrows():
+        titulo_limpio = limpiar(row["Título"])
+        idioma = str(row.get("Idioma", "es")).strip().lower()
+        if idioma in ["en", "ingles", "inglés"]:
+            idioma = "en"
+        else:
+            idioma = "es"
+
+        # Si el título (o parte significativa) aparece en el resumen → lo consideramos fuente
+        if any(palabra in resumen_limpio for palabra in titulo_limpio.split()[:4]):
+            if idioma == "es":
+                titulares_relacionados.append({
+                    "titulo": row["Título"],
+                    "medio": row["Fuente"],
+                    "enlace": row["Enlace"],
+                    "idioma": idioma
+                })
+            else:
+                titulares_relacionados_en.append({
+                    "titulo": row["Título"],
+                    "medio": row["Fuente"],
+                    "enlace": row["Enlace"],
+                    "idioma": idioma
+                })
+
+    # Si no detectó suficientes titulares (por redacción diferente), tomar los más importantes del día
+    if len(titulares_relacionados) < 3:
+        titulares_relacionados = [
+            {"titulo": row["Título"], "medio": row["Fuente"], "enlace": row["Enlace"], "idioma": "es"}
+            for _, row in noticias_dia[noticias_dia["Idioma"].str.lower().isin(["es", "español"])].head(6).iterrows()
+        ]
+
+    if len(titulares_relacionados_en) < 3:
+        titulares_relacionados_en = [
+            {"titulo": row["Título"], "medio": row["Fuente"], "enlace": row["Enlace"], "idioma": "en"}
+            for _, row in noticias_dia[noticias_dia["Idioma"].str.lower().isin(["en", "ingles", "inglés"])].head(6).iterrows()
+        ]
+
+        # 🔁 Evitar repetir medios en titulares relacionados (ES + EN)
+    def filtrar_sin_repetir_medios(lista_titulares):
+        vistos = set()
+        filtrados = []
+        for t in lista_titulares:
+            medio = t.get("medio", "").strip()
+            if medio and medio not in vistos:
+                filtrados.append(t)
+                vistos.add(medio)
+        return filtrados
+
+    titulares_relacionados = filtrar_sin_repetir_medios(titulares_relacionados)
+    titulares_relacionados_en = filtrar_sin_repetir_medios(titulares_relacionados_en)
 
     # --- Generar nube ---
     os.makedirs("nubes", exist_ok=True)
@@ -875,63 +933,10 @@ Noticias no relacionadas con aranceles:
             economia_dict[col] = economia_dia.iloc[0][col]
 
 
+    # 📰 Titulares relacionados con el resumen (en español e inglés)
+    titulares_info = titulares_relacionados
+    titulares_info_en = titulares_relacionados_en
 
-    # 📰 Titulares sin repetir medios
-    titulares_info = []
-    usados_medios = set()
-
-    def agregar_titulares(df_origen, max_count, idioma_filtrado="es"):
-        added = 0
-        for _, row in df_origen.iterrows():
-            medio = row["Fuente"]
-            idioma = str(row.get("Idioma", "es")).strip().lower()
-            if idioma in ["en", "ingles", "inglés"]:
-                idioma = "en"
-            else:
-                idioma = "es"
-
-            if idioma != idioma_filtrado:
-                continue
-
-            if medio not in usados_medios:
-                titulares_info.append({
-                    "titulo": row["Título"],
-                    "medio": medio,
-                    "enlace": row["Enlace"],
-                    "idioma": idioma
-                })
-                usados_medios.add(medio)
-                added += 1
-            if added >= max_count:
-                break
-
-
-
-    # 2 nacionales + 2 locales + 2 internacionales + 2 otros = 8 titulares distintos
-    agregar_titulares(noticias_nacionales, 2, idioma_filtrado="es")
-    agregar_titulares(noticias_locales, 2, idioma_filtrado="es")
-    agregar_titulares(noticias_internacionales_forzadas, 2, idioma_filtrado="es")
-    agregar_titulares(noticias_otras_forzadas, 2, idioma_filtrado="es")
-
-
-    # 📰 Titulares en inglés (máx. 8)
-    titulares_info_en = []
-    if "Idioma" in noticias_dia.columns:
-        notas_en = noticias_dia[noticias_dia["Idioma"].str.lower().isin(["en", "inglés", "ingles"])]
-        notas_en = notas_en.dropna(subset=["Título"]).drop_duplicates(subset=["Título", "Fuente", "Enlace"])
-        usados_medios_en = set()
-        for _, row in notas_en.iterrows():
-            medio = row["Fuente"]
-            if medio not in usados_medios_en:
-                titulares_info_en.append({
-                    "titulo": row["Título"],
-                    "medio": medio,
-                    "enlace": row["Enlace"],
-                    "idioma": "en"
-                })
-                usados_medios_en.add(medio)
-            if len(titulares_info_en) >= 8:
-                break
 
         # ------------------------------
     # 💾 Guardar resumen y subir a S3
