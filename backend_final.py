@@ -387,6 +387,7 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - CBRE es una empresa de real estate que significa Coldwell Banker Richard Ellis.
 - John Roberts es el Presidente de la Suprema Corte de Estados Unidos.
 - Hugo Aguilar Ortíz es el Presidente de la Suprema Corte de México.
+- El fentanilo es una droga ilegal consumida en Estados Unidos y producida por México y por China. Estados Unidos ha ejercido significativa presión para que ambos países usen la fuerza del estado para detener a los grupos que lo producen así como limitar la propagación de precursores usados en su producción.
 """
 
 def extraer_fechas(pregunta):
