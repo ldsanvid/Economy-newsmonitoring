@@ -725,10 +725,9 @@ def generar_resumen_y_datos(fecha_str):
 
 Estructura:
 1️⃣ Primer párrafo: Tema más relevante del día (qué, quién, cómo).
-2️⃣ Segundo: Aranceles, tasas, acuerdos, bancos centrales, comercio exterior.
+2️⃣ Segundo: Aranceles, tasas, acuerdos, bancos centrales, comercio exterior y panorama internacional.
 3️⃣ Tercer: Noticias locales (estados, municipios, construcción, transporte, industria automotriz).
 4️⃣ Cuarto: Fibras, naves industriales, parques industriales, real estate, sector industrial.
-5️⃣ Quinto (opcional): panorama internacional si hay información adicional.
 
 Noticias nacionales:
 {contexto_nacional}
