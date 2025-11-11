@@ -385,6 +385,8 @@ Contexto actualizado a julio 2025. Estas afirmaciones SON OBLIGATORIAS y tienen 
 - La ANPACT es la Asociación Nacional de Productores de Autobuses, Camiones y Tractocamiones.
 - El INVEA es Instituto de Verificación Administrativa de la Ciudad de México.
 - CBRE es una empresa de real estate que significa Coldwell Banker Richard Ellis.
+- John Roberts es el Presidente de la Suprema Corte de Estados Unidos.
+- Hugo Aguilar Ortíz es el Presidente de la Suprema Corte de México.
 """
 
 def extraer_fechas(pregunta):
@@ -724,10 +726,10 @@ def generar_resumen_y_datos(fecha_str):
 - NO copies frases ni estructuras de los resúmenes anteriores.
 
 Estructura:
-1️⃣ Primer párrafo: Tema más relevante del día (qué, quién, cómo).
-2️⃣ Segundo: Aranceles, tasas, acuerdos, bancos centrales, comercio exterior y panorama internacional.
-3️⃣ Tercer: Noticias locales (estados, municipios, construcción, transporte, industria automotriz).
-4️⃣ Cuarto: Fibras, naves industriales, parques industriales, real estate, sector industrial.
+Primer párrafo: Tema más relevante del día (qué, quién, cómo).
+Segundo: Aranceles, tasas, acuerdos, bancos centrales, comercio exterior y panorama internacional.
+Tercer: Noticias locales (estados, municipios, construcción, transporte, industria automotriz).
+Cuarto: Fibras, naves industriales, parques industriales, real estate, sector industrial.
 
 Noticias nacionales:
 {contexto_nacional}
