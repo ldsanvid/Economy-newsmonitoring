@@ -821,6 +821,10 @@ Noticias no relacionadas con aranceles:
 
     titulares_relacionados = filtrar_sin_repetir_medios(titulares_relacionados)
     titulares_relacionados_en = filtrar_sin_repetir_medios(titulares_relacionados_en)
+        # 🔢 Limitar la cantidad de titulares mostrados
+    titulares_relacionados = titulares_relacionados[:12]
+    titulares_relacionados_en = titulares_relacionados_en[:12]
+
 
     # --- Generar nube ---
     os.makedirs("nubes", exist_ok=True)
