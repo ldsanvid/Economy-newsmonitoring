@@ -1264,6 +1264,8 @@ def enviar_email():
         for col in ["Tipo de Cambio FIX", "Nivel máximo", "Nivel mínimo"]:
             if col in economia_dia.columns:
                 economia_dia[col] = pd.to_numeric(economia_dia[col], errors="coerce")
+                economia_dia[col] = economia_dia[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
+
 
         # 🔹 Tasas
         for col in ["Tasa de Interés Objetivo Banxico", "TIIE 28 días", "TIIE 91 días", "TIIE 182 días",
