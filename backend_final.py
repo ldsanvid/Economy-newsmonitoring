@@ -2122,17 +2122,6 @@ def enviar_email():
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
             <tr>
                 <td align="left" style="vertical-align:middle;">
-                   <img src="cid:logo"
-                        alt="Industrial Gate"
-                        width="180"
-                        style="
-                            display:block;
-                            margin:0 auto;
-                            width:180px;
-                            max-width:180px;
-                            height:auto;
-                            -ms-interpolation-mode:bicubic;
-                        "> 
                 </td>
                 <td align="right" style="font-weight:700; font-size:1.2rem; color:#111;">
                     Monitoreo<span style="color:#FFB429;">+</span>
@@ -2191,15 +2180,7 @@ def enviar_email():
             imagen.add_header("Content-ID", "<nube>")
             imagen.add_header("Content-Disposition", "inline", filename=archivo_nube)
             msg.attach(imagen)
-
-    # 📎 Adjuntar logo del cliente inline
-    if os.path.exists("logo.png"):  # asegúrate de poner el logo en tu carpeta del proyecto
-        with open("logo.png", "rb") as logo_file:
-            logo = MIMEImage(logo_file.read())
-            logo.add_header("Content-ID", "<logo>")
-            logo.add_header("Content-Disposition", "inline", filename="logo.png")
-            msg.attach(logo)        
-
+      
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)  # Gmail
         server.starttls()
