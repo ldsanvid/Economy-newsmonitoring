@@ -14,3 +14,7 @@ Babel
 boto3
 faiss-cpu==1.7.4
 gunicorn
+python-dotenv
+langchain-openai
+langchain-community
+langchain-core

@@ -4,9 +4,7 @@ import numpy as np
 from openai import OpenAI
 import os
 import re
-from datetime import datetime
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from datetime import datetime, timedelta
 import dateparser
 from dateparser.search import search_dates
 import csv
@@ -20,16 +18,20 @@ from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email import encoders
 from email.utils import formataddr
+from dotenv import load_dotenv
 
-import base64
-import requests
-import calendar
+
 from babel.dates import format_date
-from flask_cors import CORS
 from s3_utils import s3_download_all as r2_download_all, s3_upload as r2_upload
 import numpy as np
 import faiss
 
+# LangChain / RAG
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS as LCFAISS
+from langchain_core.documents import Document
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 
 
 def nombre_mes(fecha):
@@ -40,6 +42,7 @@ def nombre_mes(fecha):
 # ------------------------------
 # 🔑 Configuración API y Flask
 # ------------------------------
+load_dotenv()
 app = Flask(__name__)
 from flask_cors import CORS
 CORS(app)
@@ -81,6 +84,372 @@ try:
     else:
         print("⚠️ No se encontró columna con 'fecha' en el nombre.")
         df["Fecha"] = pd.NaT
+# 🔗 ---------- LangChain: embeddings, vectorstores y LLM ----------
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+    embeddings = OpenAIEmbeddings(
+        model="text-embedding-3-small",
+        api_key=api_key,
+)
+
+    vectorstore_noticias = None
+    retriever_noticias = None
+
+    vectorstore_resumenes = None
+    retriever_resumenes = None
+
+    # ------------------------------
+    # 🔗 MODELO LLM Y CHAIN PARA /pregunta
+    # ------------------------------
+
+    llm_chat = ChatOpenAI(
+        model="gpt-4o",
+        temperature=0,
+        api_key=api_key,
+    )
+
+    prompt_pregunta = ChatPromptTemplate.from_messages([
+        ("system", """
+Eres un analista experto en noticias, geopolítica y economía.
+Responde SIEMPRE en español.
+NO inventes datos ni traigas información de fuera del contexto.
+Si el contexto incluye al menos un titular o un resumen relevante, NO digas que “no se dispone de información” ni frases parecidas; en su lugar, explica lo que SÍ se sabe con base en esos elementos.
+Solo si el contexto está totalmente vacío (sin titulares ni resúmenes sobre el tema) puedes decir que no hay información disponible.
+Tu objetivo es responder la pregunta del usuario de forma profesional, clara y basada en los titulares y resúmenes proporcionados.
+"""),
+        ("user", "{texto_usuario}")
+    ])
+
+
+    chain_pregunta = prompt_pregunta | llm_chat | StrOutputParser()
+    
+
+    def cargar_vectorstore_noticias(df_noticias: pd.DataFrame):
+        """
+        Construye o actualiza de forma incremental el vectorstore de noticias.
+
+        - Primera vez: embebe todas las noticias y crea el índice.
+        - Siguientes veces: detecta qué filas del df no están todavía embebidas
+        (por clave única) y solo calcula embeddings para esas noticias nuevas.
+    """
+        global vectorstore_noticias, retriever_noticias
+
+        if df_noticias is None or df_noticias.empty:
+            print("⚠️ df_noticias vacío, no se construye vectorstore_noticias")
+            vectorstore_noticias = None
+            retriever_noticias = None
+            return
+
+        # 📁 Directorio base para guardar índice y metadatos de LangChain
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        index_dir = os.path.join(base_dir, "faiss_index", "noticias_lc")
+        os.makedirs(index_dir, exist_ok=True)
+        meta_path = os.path.join(index_dir, "noticias_lc_metadata.csv")
+
+        # 1️⃣ Construir clave única para cada noticia del df actual
+        df_noticias = df_noticias.copy()
+
+        def make_unique_key(row):
+            titulo = str(row.get("Título", "")).strip()
+            fuente = str(row.get("Fuente", "")).strip()
+            fecha_val = row.get("Fecha", None)
+            if pd.notnull(fecha_val):
+                try:
+                    fecha_iso = pd.to_datetime(fecha_val).strftime("%Y-%m-%d")
+                except Exception:
+                    fecha_iso = ""
+            else:
+                fecha_iso = ""
+            return f"{fecha_iso}|{fuente}|{titulo}"
+
+        df_noticias["unique_key_lc"] = df_noticias.apply(make_unique_key, axis=1)
+
+        # 2️⃣ Leer metadatos previos (si existen) para saber qué noticias ya tienen embedding
+        existing_keys = set()
+        df_meta_prev = None
+        if os.path.exists(meta_path):
+            try:
+                df_meta_prev = pd.read_csv(meta_path, encoding="utf-8")
+                if "unique_key_lc" in df_meta_prev.columns:
+                    existing_keys = set(df_meta_prev["unique_key_lc"].astype(str))
+                print(f"ℹ️ Metadatos previos cargados: {len(existing_keys)} noticias embebidas.")
+            except Exception as e:
+                print(f"⚠️ Error al leer metadatos previos de noticias: {e}")
+                df_meta_prev = None
+                existing_keys = set()
+
+        # 3️⃣ Detectar noticias nuevas (filas cuyo unique_key_lc no está en existing_keys)
+        mask_new = ~df_noticias["unique_key_lc"].isin(existing_keys)
+        df_new = df_noticias[mask_new].copy()
+
+        if df_meta_prev is None:
+            df_meta_prev = pd.DataFrame(columns=[
+                "unique_key_lc", "Fecha", "Título", "Fuente",
+                "Enlace", "Cobertura", "Término", "Sentimiento", "Idioma"
+            ])
+
+        # 4️⃣ Cargar índice previo de LangChain (si existe)
+        vectorstore_noticias = None
+        if os.path.isdir(index_dir) and any(f.endswith(".faiss") for f in os.listdir(index_dir)):
+            try:
+                vectorstore_noticias = LCFAISS.load_local(
+                    index_dir,
+                    embeddings,
+                    allow_dangerous_deserialization=True
+                )
+                print("✅ vectorstore_noticias existente cargado desde disco.")
+            except Exception as e:
+                print(f"⚠️ No se pudo cargar vectorstore_noticias existente, se reconstruirá desde cero: {e}")
+                vectorstore_noticias = None
+
+        # 5️⃣ Construir Document para noticias nuevas
+        docs_nuevos = []
+        for _, row in df_new.iterrows():
+            titulo = str(row.get("Título", "")).strip()
+            if not titulo:
+                continue
+
+            fecha_val = row.get("Fecha", None)
+            if pd.notnull(fecha_val):
+                try:
+                    fecha_str = pd.to_datetime(fecha_val).strftime("%Y-%m-%d")
+                except Exception:
+                    fecha_str = None
+            else:
+                fecha_str = None
+
+            metadata = {
+                "fecha": fecha_str,
+                "fuente": row.get("Fuente"),
+                "enlace": row.get("Enlace"),
+                "cobertura": row.get("Cobertura"),
+                "sentimiento": row.get("Sentimiento"),
+                "termino": row.get("Término"),
+                "idioma": row.get("Idioma"),
+                "unique_key_lc": row.get("unique_key_lc"),
+            }
+
+            docs_nuevos.append(Document(page_content=titulo, metadata=metadata))
+
+        # 6️⃣ Crear o actualizar el vectorstore de noticias
+        if vectorstore_noticias is None:
+            # Primera vez: si no hay índice previo, construirlo desde cero con TODO lo nuevo
+            if docs_nuevos:
+                print(f"🧩 Construyendo vectorstore_noticias desde cero con {len(docs_nuevos)} noticias…")
+                vectorstore_noticias = LCFAISS.from_documents(docs_nuevos, embeddings)
+            else:
+                print("⚠️ No hay documentos nuevos y no existe índice previo; no se construye vectorstore_noticias.")
+                retriever_noticias = None
+                return
+        else:
+            # Ya había índice previo: solo agregamos los documentos nuevos
+            if docs_nuevos:
+                print(f"🧩 Agregando {len(docs_nuevos)} noticias nuevas a vectorstore_noticias…")
+                vectorstore_noticias.add_documents(docs_nuevos)
+            else:
+                print("ℹ️ No hay noticias nuevas para agregar. Se usa el índice existente.")
+
+        # 7️⃣ Actualizar metadatos y guardar
+        if not df_new.empty:
+            df_meta_new = df_new[[
+                "unique_key_lc", "Fecha", "Título", "Fuente",
+                "Enlace", "Cobertura", "Término", "Sentimiento", "Idioma"
+            ]].copy()
+            df_meta_final = pd.concat([df_meta_prev, df_meta_new], ignore_index=True)
+        else:
+            df_meta_final = df_meta_prev
+
+        try:
+            df_meta_final.to_csv(meta_path, index=False, encoding="utf-8-sig")
+            print(f"✅ Metadatos de noticias guardados/actualizados en {meta_path} con {len(df_meta_final)} registros.")
+        except Exception as e:
+            print(f"⚠️ Error al guardar metadatos de noticias: {e}")
+
+        # 8️⃣ Guardar índice actualizado en disco
+        try:
+            vectorstore_noticias.save_local(index_dir)
+            print(f"✅ vectorstore_noticias guardado en {index_dir}")
+        except Exception as e:
+            print(f"⚠️ Error al guardar vectorstore_noticias: {e}")
+
+        # 9️⃣ Crear el retriever
+        retriever_noticias = vectorstore_noticias.as_retriever(search_kwargs={"k": 8})
+        print("✅ retriever_noticias listo para usarse.")
+
+
+    def cargar_vectorstore_resumenes():
+        """
+        Construye o actualiza de forma incremental el vectorstore de resúmenes.
+
+        - Primera vez: embebe todos los resúmenes presentes en faiss_index/resumenes_metadata.csv
+        y crea un índice específico para LangChain.
+        - Siguientes veces: detecta qué resúmenes son nuevos (por clave única) y solo calcula embeddings
+        para esos resúmenes adicionales, agregándolos al índice existente.
+        """
+        global vectorstore_resumenes, retriever_resumenes
+
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # 📁 CSV de origen con la info de los resúmenes (tu pipeline actual)
+        origen_path = os.path.join(base_dir, "faiss_index", "resumenes_metadata.csv")
+        if not os.path.exists(origen_path):
+            print(f"⚠️ No se encontró {origen_path}, no se construye vectorstore_resumenes")
+            vectorstore_resumenes = None
+            retriever_resumenes = None
+            return
+
+        try:
+            df_origen = pd.read_csv(origen_path, encoding="utf-8")
+        except Exception as e:
+            print(f"⚠️ Error al leer {origen_path}: {e}")
+            vectorstore_resumenes = None
+            retriever_resumenes = None
+            return
+
+        if df_origen.empty:
+            print("⚠️ resumenes_metadata.csv está vacío, no se construye vectorstore_resumenes")
+            vectorstore_resumenes = None
+            retriever_resumenes = None
+            return
+
+        # Asegurar columnas esperadas mínimas
+        for col in ["fecha", "resumen"]:
+            if col not in df_origen.columns:
+                print(f"⚠️ La columna '{col}' no está en resumenes_metadata.csv")
+                vectorstore_resumenes = None
+                retriever_resumenes = None
+                return
+
+        # 📁 Directorio para el índice y metadatos específicos de LangChain
+        index_dir = os.path.join(base_dir, "faiss_index", "resumenes_lc")
+        os.makedirs(index_dir, exist_ok=True)
+        meta_lc_path = os.path.join(index_dir, "resumenes_lc_metadata.csv")
+
+        # 1️⃣ Crear clave única para cada resumen (por ejemplo: fecha|archivo_txt)
+        df_origen = df_origen.copy()
+
+        def make_unique_key(row):
+            fecha_val = str(row.get("fecha", "")).strip()
+            archivo_txt = str(row.get("archivo_txt", "")).strip()
+            if not archivo_txt:
+                # Si no hay nombre de archivo, usamos solo fecha como clave
+                return fecha_val
+            return f"{fecha_val}|{archivo_txt}"
+
+        df_origen["unique_key_lc"] = df_origen.apply(make_unique_key, axis=1)
+
+        # 2️⃣ Leer metadatos previos de LangChain (si existen) para saber qué resúmenes ya tienen embedding
+        existing_keys = set()
+        df_meta_prev = None
+        if os.path.exists(meta_lc_path):
+            try:
+                df_meta_prev = pd.read_csv(meta_lc_path, encoding="utf-8")
+                if "unique_key_lc" in df_meta_prev.columns:
+                    existing_keys = set(df_meta_prev["unique_key_lc"].astype(str))
+                print(f"ℹ️ Metadatos previos de resúmenes cargados: {len(existing_keys)} embebidos.")
+            except Exception as e:
+                print(f"⚠️ Error al leer metadatos previos de resúmenes: {e}")
+                df_meta_prev = None
+                existing_keys = set()
+        if df_meta_prev is None:
+            df_meta_prev = pd.DataFrame(columns=[
+                "unique_key_lc", "fecha", "archivo_txt", "nube", "titulares"
+            ])
+
+        # 3️⃣ Detectar resúmenes nuevos (clave única no vista antes)
+        mask_new = ~df_origen["unique_key_lc"].isin(existing_keys)
+        df_new = df_origen[mask_new].copy()
+
+        # 4️⃣ Cargar índice previo de LangChain (si existe)
+        vectorstore_resumenes = None
+        if os.path.isdir(index_dir) and any(f.endswith(".faiss") for f in os.listdir(index_dir)):
+            try:
+                vectorstore_resumenes = LCFAISS.load_local(
+                    index_dir,
+                    embeddings,
+                    allow_dangerous_deserialization=True
+                )
+                print("✅ vectorstore_resumenes existente cargado desde disco.")
+            except Exception as e:
+                print(f"⚠️ No se pudo cargar vectorstore_resumenes existente, se reconstruirá desde cero: {e}")
+                vectorstore_resumenes = None
+
+        # 5️⃣ Crear Document para resúmenes nuevos
+        docs_nuevos = []
+        for _, row in df_new.iterrows():
+            texto = str(row.get("resumen", "")).strip()
+            if not texto:
+                continue
+
+            fecha_meta = str(row.get("fecha", "")).strip() or None
+            archivo_txt = str(row.get("archivo_txt", "")).strip() or None
+            nube = str(row.get("nube", "")).strip() or None
+            titulares = row.get("titulares", None)
+            unique_key = row.get("unique_key_lc")
+
+            metadata = {
+                "fecha": fecha_meta,
+                "archivo_txt": archivo_txt,
+                "nube": nube,
+                "titulares": titulares,
+                "tipo": "resumen",
+                "unique_key_lc": unique_key,
+            }
+
+            docs_nuevos.append(Document(page_content=texto, metadata=metadata))
+
+        # 6️⃣ Crear o actualizar el vectorstore de resúmenes
+        if vectorstore_resumenes is None:
+            # Primera vez: construimos el índice solo con los docs nuevos (que en la práctica serán todos)
+            if docs_nuevos:
+                print(f"🧩 Construyendo vectorstore_resumenes desde cero con {len(docs_nuevos)} resúmenes…")
+                vectorstore_resumenes = LCFAISS.from_documents(docs_nuevos, embeddings)
+            else:
+                print("⚠️ No hay resúmenes nuevos y no existe índice previo; no se construye vectorstore_resumenes.")
+                retriever_resumenes = None
+                return
+        else:
+            # Ya había índice previo: solo agregamos los resúmenes nuevos
+            if docs_nuevos:
+                print(f"🧩 Agregando {len(docs_nuevos)} resúmenes nuevos a vectorstore_resumenes…")
+                vectorstore_resumenes.add_documents(docs_nuevos)
+            else:
+                print("ℹ️ No hay resúmenes nuevos para agregar. Se usa el índice existente.")
+
+        # 7️⃣ Actualizar metadatos de LangChain y guardar
+        if not df_new.empty:
+            df_meta_new = df_new[[
+                "unique_key_lc", "fecha", "archivo_txt", "nube", "titulares"
+            ]].copy()
+            df_meta_final = pd.concat([df_meta_prev, df_meta_new], ignore_index=True)
+        else:
+            df_meta_final = df_meta_prev
+
+        try:
+            df_meta_final.to_csv(meta_lc_path, index=False, encoding="utf-8-sig")
+            print(f"✅ Metadatos de resúmenes guardados/actualizados en {meta_lc_path} con {len(df_meta_final)} registros.")
+        except Exception as e:
+            print(f"⚠️ Error al guardar metadatos de resúmenes: {e}")
+
+        # 8️⃣ Guardar índice actualizado en disco
+        try:
+            vectorstore_resumenes.save_local(index_dir)
+            print(f"✅ vectorstore_resumenes guardado en {index_dir}")
+        except Exception as e:
+            print(f"⚠️ Error al guardar vectorstore_resumenes: {e}")
+
+        # 9️⃣ Crear el retriever
+        retriever_resumenes = vectorstore_resumenes.as_retriever(search_kwargs={"k": 3})
+        print("✅ retriever_resumenes listo para usarse.")
+
+    # ==========================================
+    # 🧩 Inicializar Vectorstores (RAG)
+    # ==========================================
+    print("⚙️ Inicializando vectorstore de noticias...")
+    cargar_vectorstore_noticias(df)
+
+    print("⚙️ Inicializando vectorstore de resúmenes...")
+    cargar_vectorstore_resumenes()
 
 except Exception as e:
     print(f"❌ Error al cargar CSV de noticias: {e}")
@@ -163,38 +532,7 @@ df_infl_mx = pd.read_excel(excel_path, sheet_name="InflaciónMEX").rename(column
     "Inflación Subyacente": "Inflación Subyacente MEX"
 })
 
-# ------------------------------
-# 🧠 Carga del índice FAISS (para búsqueda semántica) — con rutas absolutas y diagnóstico
-# ------------------------------
 
-USE_FAISS = True
-try:
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    faiss_dir = os.path.join(base_dir, "faiss_index")
-
-    index_path = os.path.join(faiss_dir, "noticias_index.faiss")
-    meta_path = os.path.join(faiss_dir, "noticias_metadata.csv")
-
-    # 🔍 Verifica existencia antes de cargar
-    if not os.path.exists(index_path):
-        raise FileNotFoundError(f"No se encontró el archivo FAISS: {index_path}")
-    if not os.path.exists(meta_path):
-        raise FileNotFoundError(f"No se encontró el archivo de metadatos: {meta_path}")
-
-    index = faiss.read_index(index_path)
-    df_metadata = pd.read_csv(meta_path)
-
-    # Validar columnas necesarias
-    columnas_requeridas = ["id","Fecha","Título","Fuente","Enlace","Cobertura","Término","Sentimiento"]
-    if not all(col in df_metadata.columns for col in columnas_requeridas):
-        raise ValueError("❌ El CSV de metadatos FAISS no contiene todas las columnas requeridas.")
-
-    print(f"✅ FAISS cargado correctamente con {len(df_metadata)} registros.")
-    print(f"📂 Ruta del índice: {index_path}")
-
-except Exception as e:
-    USE_FAISS = False
-    print(f"⚠️ No se pudo cargar FAISS, se usará TF-IDF. Motivo: {e}")
 # 🧹 Utilidad para sanear JSON (convierte NaN/inf a None y numpy → tipos nativos)
 def _json_sanitize(x):
     import math, numpy as np
@@ -531,74 +869,6 @@ def filtrar_titulares(df_filtrado, entidades, sentimiento_deseado):
         filtro = filtro[filtro["Sentimiento"] == sentimiento_deseado]
 
     return filtro
-
-# ------------------------------
-# 🔍 Búsqueda semántica con FAISS o TF-IDF (según disponibilidad)
-# ------------------------------
-def buscar_semantica_noticias(query, df_base, top_k=200):
-    """
-    Si hay FAISS: busca en TODO el corpus y luego intersecta con df_base (filtros de fecha/entidades/sentimiento).
-    Si no hay FAISS: hace TF-IDF sobre df_base.
-    Devuelve un DataFrame con las top coincidencias (máx 10).
-    """
-    q = query.strip()
-    if not USE_FAISS:
-        tfidf = TfidfVectorizer()
-        X = tfidf.fit_transform(df_base["Título"])
-        v = tfidf.transform([q])
-        sims = cosine_similarity(v, X).flatten()
-        idx = sims.argsort()[-10:][::-1]   # ← cambiado a 10
-        return df_base.iloc[idx]
-
-    try:
-        emb_q = client.embeddings.create(
-            model="text-embedding-3-small", input=q
-        ).data[0].embedding
-
-        vq = np.array(emb_q, dtype="float32")[np.newaxis, :]
-        sims, ids = index.search(vq, top_k)
-        candidatos = df_metadata.iloc[ids[0]].copy()
-
-        # Intersección con df_base por campos clave
-        clave = ["Título", "Fuente", "Enlace"]
-        mergeado = candidatos.merge(
-            df_base[clave + ["Fecha", "Cobertura", "Término", "Sentimiento"]],
-            on=clave, how="inner"
-        )
-
-        if mergeado.empty:
-            tfidf = TfidfVectorizer()
-            X = tfidf.fit_transform(df_base["Título"])
-            v = tfidf.transform([q])
-            sims = cosine_similarity(v, X).flatten()
-            idx = sims.argsort()[-10:][::-1]   # ← cambiado a 10
-            return df_base.iloc[idx]
-
-        orden = {t: i for i, t in enumerate(candidatos["Título"].tolist())}
-        mergeado["__rank"] = mergeado["Título"].map(orden)
-        mergeado = mergeado.sort_values("__rank").drop(columns="__rank")
-        return mergeado.head(10)
-
-    except Exception:
-        tfidf = TfidfVectorizer()
-        X = tfidf.fit_transform(df_base["Título"])
-        v = tfidf.transform([q])
-        sims = cosine_similarity(v, X).flatten()
-        idx = sims.argsort()[-10:][::-1]   # ← cambiado a 10
-        return df_base.iloc[idx[:10]]
-
-
-
-
-# 6️⃣ Seleccionar titulares más relevantes (TF-IDF + coseno)
-def seleccionar_titulares_relevantes(titulares, pregunta):
-    if not titulares:
-        return []
-    vectorizer = TfidfVectorizer().fit(titulares + [pregunta])
-    vectores = vectorizer.transform(titulares + [pregunta])
-    similitudes = cosine_similarity(vectores[-1], vectores[:-1]).flatten()
-    indices_similares = similitudes.argsort()[-5:][::-1]
-    return [titulares[i] for i in indices_similares]
 
 # 7️⃣ Nube de palabras con colores y stopwords personalizadas
 def color_func(word, font_size, position, orientation, random_state=None, **kwargs):
@@ -1065,136 +1335,633 @@ def extraer_rango_fechas(pregunta):
         if fecha_inicio and fecha_fin:
             return fecha_inicio.date(), fecha_fin.date()
     return None, None
+MESES_ES = {
+    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4,
+    "mayo": 5, "junio": 6, "julio": 7, "agosto": 8,
+    "septiembre": 9, "setiembre": 9,
+    "octubre": 10, "noviembre": 11, "diciembre": 12,
+}
+# -----------------------------------------
+# 🆕 Helper para obtener semanas reales del mes (lunes–viernes)
+# -----------------------------------------
+def normalizar_frase_semanas(texto: str) -> str:
+    """
+    Normaliza frases del tipo:
+    - 'entre la primera semana de noviembre y la segunda?'
+    - 'entre la primera semana de noviembre y la segunda de noviembre?'
+
+    para que queden como:
+    - 'entre la primera semana de noviembre y la segunda semana de noviembre'
+    """
+
+    meses_regex = (
+        r"enero|febrero|marzo|abril|mayo|junio|julio|agosto|"
+        r"septiembre|setiembre|octubre|noviembre|diciembre"
+    )
+
+    # ¿Hay alguna referencia explícita a 'X semana de <mes>'?
+    m = re.search(
+        r"(primera|segunda|tercera|cuarta)\s+semana\s+de\s+(" + meses_regex + r")",
+        texto,
+        re.IGNORECASE,
+    )
+    if not m:
+        return texto  # si no hay semanas del mes, no tocamos nada
+
+    mes = m.group(2)
+
+    # 1) Caso: '... y la segunda de noviembre' -> '... y la segunda semana de noviembre'
+    texto = re.sub(
+        r"\by\s+la\s+(segunda|tercera|cuarta)\s+de\s+" + mes + r"\b",
+        lambda m3: f" y la {m3.group(1)} semana de {mes}",
+        texto,
+        flags=re.IGNORECASE,
+    )
+
+    # 2) Caso: '... y la segunda?' -> '... y la segunda semana de noviembre'
+    texto = re.sub(
+        r"\by\s+la\s+(segunda|tercera|cuarta)\b(?!\s+semana)",
+        lambda m2: f" y la {m2.group(1)} semana de {mes}",
+        texto,
+        flags=re.IGNORECASE,
+    )
+
+    # Limpieza de espacios dobles
+    texto = re.sub(r"\s{2,}", " ", texto)
+
+    return texto
+
+def obtener_semanas_del_mes(anio, mes, fecha_min_dataset, fecha_max_dataset):
+    """
+    Devuelve una lista de rangos semanales reales dentro de un mes:
+    - Cada semana inicia en LUNES
+    - Cada semana termina en DOMINGO, pero luego se ajusta al dataset
+    - Solo se devuelven semanas que tengan algún día dentro del dataset
+    """
+    semanas = []
+
+    # Primer día del mes
+    desde = datetime(anio, mes, 1).date()
+
+    # Último día del mes
+    if mes == 12:
+        hasta = datetime(anio + 1, 1, 1).date() - timedelta(days=1)
+    else:
+        hasta = datetime(anio, mes + 1, 1).date() - timedelta(days=1)
+
+    # Mover "desde" al lunes de esa semana
+    inicio = desde - timedelta(days=desde.weekday())  # weekday: lunes=0
+
+    while inicio <= hasta:
+        fin = inicio + timedelta(days=6)
+
+        # Ajustar al mes
+        real_inicio = max(inicio, desde)
+        real_fin = min(fin, hasta)
+
+        # Ajustar al dataset
+        final_inicio = max(real_inicio, fecha_min_dataset)
+        final_fin = min(real_fin, fecha_max_dataset)
+
+        # Si el rango tiene al menos un día válido → agregarlo
+        if final_inicio <= final_fin:
+            semanas.append((final_inicio, final_fin))
+
+        # Siguiente semana
+        inicio += timedelta(days=7)
+
+    return semanas
+
+MESES_ES = {
+    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4,
+    "mayo": 5, "junio": 6, "julio": 7, "agosto": 8,
+    "septiembre": 9, "setiembre": 9,
+    "octubre": 10, "noviembre": 11, "diciembre": 12,
+}
+
+def interpretar_rango_fechas(pregunta: str, df_noticias: pd.DataFrame):
+    """
+    Interpreta fechas o rangos mencionados en la pregunta y los ajusta
+    al rango disponible en df_noticias.
+
+    Devuelve (fecha_inicio, fecha_fin, origen), donde las fechas son date o None.
+    """
+    if df_noticias is None or df_noticias.empty:
+        return None, None, "sin_datos"
+
+    fechas_validas = df_noticias["Fecha"].dropna()
+    if fechas_validas.empty:
+        return None, None, "sin_datos"
+
+    fecha_min = fechas_validas.min().date()
+    fecha_max = fechas_validas.max().date()
+
+    texto = (pregunta or "")
+    texto_lower = texto.lower()
+    texto_lower = normalizar_frase_semanas(texto_lower)
+
+    fecha_inicio = None
+    fecha_fin = None
+    origen = "sin_fecha"
+
+    # 1️⃣ Casos relativos: "esta semana", "hoy", "ayer"
+    if fecha_inicio is None and fecha_fin is None:
+        if "esta semana" in texto_lower:
+            fecha_fin = fecha_max
+            fecha_inicio = max(fecha_min, fecha_max - timedelta(days=6))
+            origen = "esta_semana_dataset"
+        elif re.search(r"\bhoy\b", texto_lower):
+            fecha_inicio = fecha_fin = fecha_max
+            origen = "hoy_dataset"
+        elif re.search(r"\bayer\b(?=[\s,.!?;:]|$)", texto_lower):
+            candidata = fecha_max - timedelta(days=1)
+            if candidata < fecha_min:
+                candidata = fecha_min
+            fecha_inicio = fecha_fin = candidata
+            origen = "ayer_dataset"
+
+    # 2️⃣ Rango de semanas:
+    #    - "entre la primera y la segunda semana de noviembre"
+    #    - "entre la primera semana de noviembre y la segunda semana de noviembre"
+    #    - "entre la primera semana de noviembre y la segunda de noviembre"
+    if fecha_inicio is None and fecha_fin is None:
+        # Forma 1: entre la primera y la segunda semana de noviembre
+        patron1 = re.search(
+            r"entre\s+(?:a\s+la|al|la)\s+(primera|segunda|tercera|cuarta)\s+y\s+"
+            r"(?:a\s+la|al|la)\s+(primera|segunda|tercera|cuarta)\s+semana\s+de\s+"
+            r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)",
+            texto_lower,
+        )
+        # Forma 2: entre la primera semana de noviembre y la segunda semana de noviembre
+        patron2 = re.search(
+            r"entre\s+(?:a\s+la|al|la)\s+(primera|segunda|tercera|cuarta)\s+semana\s+de\s+"
+            r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)"
+            r"\s+y\s+(?:a\s+la|al|la)\s+(primera|segunda|tercera|cuarta)\s+semana\s+de\s+\2",
+            texto_lower,
+        )
+        # Forma 3: entre la primera semana de noviembre y la segunda de noviembre
+        patron3 = re.search(
+            r"entre\s+(?:a\s+la|al|la)\s+(primera|segunda|tercera|cuarta)\s+semana\s+de\s+"
+            r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)"
+            r"\s+y\s+(?:a\s+la|al|la)\s+(primera|segunda|tercera|cuarta)\s+de\s+\2",
+            texto_lower,
+        )
+        if patron1 or patron2 or patron3:
+            if patron1:
+                ord1, ord2, nombre_mes = patron1.groups()
+            elif patron2:
+                # patron2: (ordinal1, mes, ordinal2)
+                ord1, nombre_mes, ord2 = patron2.groups()
+            else:
+                # patron3: (ordinal1, mes, ordinal2)
+                ord1, nombre_mes, ord2 = patron3.groups()
+
+            mes_num = MESES_ES.get(nombre_mes)
+            if mes_num:
+                anio = fecha_max.year
+                # Inicio y fin del mes calendario
+                desde = datetime(anio, mes_num, 1).date()
+                if mes_num == 12:
+                    hasta = datetime(anio + 1, 1, 1).date() - timedelta(days=1)
+                else:
+                    hasta = datetime(anio, mes_num + 1, 1).date() - timedelta(days=1)
+
+                # Semanas "fijas" (1–7, 8–14, 15–21, 22–28)
+                semanas = [
+                    (desde, desde + timedelta(days=6)),                      # primera
+                    (desde + timedelta(days=7), desde + timedelta(days=13)), # segunda
+                    (desde + timedelta(days=14), desde + timedelta(days=20)),# tercera
+                    (desde + timedelta(days=21), desde + timedelta(days=27)) # cuarta
+                ]
+                ordenes = ["primera", "segunda", "tercera", "cuarta"]
+                i1 = ordenes.index(ord1)
+                i2 = ordenes.index(ord2)
+                idx_min, idx_max = min(i1, i2), max(i1, i2)
+
+                fecha_inicio, _ = semanas[idx_min]
+                _, fecha_fin = semanas[idx_max]
+                origen = "rango_semanas_mes"
+
+
+
+    # 3️⃣ Una sola semana: "primera/segunda/tercera/cuarta semana de noviembre"
+    if fecha_inicio is None and fecha_fin is None:
+        m_semana_mes = re.search(
+            r"(primera|segunda|tercera|cuarta)\s+semana\s+de\s+"
+            r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)",
+            texto_lower
+        )
+        if m_semana_mes:
+            ord_semana = m_semana_mes.group(1)
+            nombre_mes = m_semana_mes.group(2)
+            mes_num = MESES_ES.get(nombre_mes)
+            if mes_num:
+                anio = fecha_max.year
+
+                desde = datetime(anio, mes_num, 1).date()
+                if mes_num == 12:
+                    hasta = datetime(anio + 1, 1, 1).date() - timedelta(days=1)
+                else:
+                    hasta = datetime(anio, mes_num + 1, 1).date() - timedelta(days=1)
+
+                semanas = [
+                    (desde, desde + timedelta(days=6)),                      # primera
+                    (desde + timedelta(days=7), desde + timedelta(days=13)), # segunda
+                    (desde + timedelta(days=14), desde + timedelta(days=20)),# tercera
+                    (desde + timedelta(days=21), desde + timedelta(days=27)) # cuarta
+                ]
+                idx = ["primera", "segunda", "tercera", "cuarta"].index(ord_semana)
+                fecha_inicio, fecha_fin = semanas[idx]
+                origen = "semana_del_mes"
+
+    # 4️⃣ Mes completo: "en noviembre", "durante noviembre"
+    if fecha_inicio is None and fecha_fin is None:
+        m_mes = re.search(
+            r"en\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)",
+            texto_lower,
+        )
+        if m_mes:
+            nombre_mes = m_mes.group(1)
+            mes_num = MESES_ES.get(nombre_mes)
+            if mes_num:
+                m_anio = re.search(r"(20\d{2})", texto_lower)
+                anio = int(m_anio.group(1)) if m_anio else fecha_max.year
+
+                desde = datetime(anio, mes_num, 1).date()
+                if mes_num == 12:
+                    hasta = datetime(anio + 1, 1, 1).date() - timedelta(days=1)
+                else:
+                    hasta = datetime(anio, mes_num + 1, 1).date() - timedelta(days=1)
+
+                fecha_inicio, fecha_fin = desde, hasta
+                origen = "mes_completo"
+
+    # 5️⃣ Rangos explícitos "entre el 3 y el 7 de noviembre" / "del 3 al 7 de noviembre"
+    if fecha_inicio is None and fecha_fin is None:
+        patron_entre = re.search(
+            r"entre\s+el\s+(\d{1,2})\s+y\s+el\s+(\d{1,2})\s+de\s+"
+            r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)",
+            texto_lower,
+        )
+        patron_del = re.search(
+            r"del\s+(\d{1,2})\s+al\s+(\d{1,2})\s+de\s+"
+            r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)",
+            texto_lower,
+        )
+
+        m = patron_entre or patron_del
+        if m:
+            dia1 = int(m.group(1))
+            dia2 = int(m.group(2))
+            nombre_mes = m.group(3)
+            mes_num = MESES_ES.get(nombre_mes)
+            if mes_num:
+                m_anio = re.search(r"(20\d{2})", texto_lower)
+                anio = int(m_anio.group(1)) if m_anio else fecha_max.year
+
+                d_ini = min(dia1, dia2)
+                d_fin = max(dia1, dia2)
+
+                try:
+                    fecha_inicio = datetime(anio, mes_num, d_ini).date()
+                    fecha_fin = datetime(anio, mes_num, d_fin).date()
+                    origen = "rango_explicito_texto"
+                except ValueError:
+                    fecha_inicio = None
+                    fecha_fin = None
+                    origen = "sin_fecha_valida"
+
+    # 6️⃣ Último intento con search_dates (fecha puntual o rango)
+    if fecha_inicio is None and fecha_fin is None and "search_dates" in globals():
+        try:
+            resultados = search_dates(
+                texto,
+                languages=["es"],
+                settings={"RELATIVE_BASE": datetime.combine(fecha_max, datetime.min.time())},
+            ) or []
+        except Exception:
+            resultados = []
+
+        if resultados:
+            fechas_detectadas = [r[1].date() for r in resultados]
+
+            if (
+                ("entre " in texto_lower or " del " in texto_lower or "del " in texto_lower or "desde " in texto_lower)
+                and len(fechas_detectadas) >= 2
+            ):
+                fecha_inicio = min(fechas_detectadas[0], fechas_detectadas[1])
+                fecha_fin = max(fechas_detectadas[0], fechas_detectadas[1])
+                origen = "rango_explicito_search_dates"
+            else:
+                fecha_inicio = fecha_fin = fechas_detectadas[0]
+                origen = "fecha_puntual"
+
+    # 7️⃣ Ajustar al rango del dataset
+    if fecha_inicio is not None and fecha_fin is not None:
+        original_inicio, original_fin = fecha_inicio, fecha_fin
+        fecha_inicio = max(fecha_inicio, fecha_min)
+        fecha_fin = min(fecha_fin, fecha_max)
+
+        if fecha_inicio > fecha_fin:
+            return None, None, "fuera_rango_dataset"
+
+        if (fecha_inicio, fecha_fin) != (original_inicio, original_fin):
+            origen += "_ajustada_dataset"
+
+    return fecha_inicio, fecha_fin, origen
+
+
+
+def filtrar_docs_por_rango(docs, fecha_inicio, fecha_fin):
+    """
+    Filtra una lista de Document de LangChain por metadata['fecha'] en el rango dado.
+    Devuelve (docs_filtrados, se_aplico_filtro: bool).
+    """
+    if not docs or not fecha_inicio or not fecha_fin:
+        return docs, False
+
+    filtrados = []
+    for d in docs:
+        meta = getattr(d, "metadata", {}) or {}
+        fecha_meta = meta.get("fecha")
+        if not fecha_meta:
+            continue
+        try:
+            f = pd.to_datetime(fecha_meta).date()
+        except Exception:
+            continue
+        if fecha_inicio <= f <= fecha_fin:
+            filtrados.append(d)
+
+    if filtrados:
+        return filtrados, True
+    else:
+        # Si el filtro deja todo vacío, devolvemos la lista original
+        # para no quedarnos sin contexto.
+        return docs, False
 
 #pregunta!!!!    
 # ------------------------------
-# 🤖 Endpoint /pregunta (ahora con RAG real + FAISS)
+# 🤖 Endpoint /pregunta (RAG con filtro por fecha antes de FAISS)
 # ------------------------------
 @app.route("/pregunta", methods=["POST"])
 def pregunta():
+    """
+    Chatbot principal (versión LangChain).
+
+    - Interpreta fechas/rangos y, si existen noticias en ese periodo,
+      construye un mini-vectorstore FAISS SOLO con esas noticias.
+    - Si NO hay noticias en ese rango o no se menciona fecha, usa el
+      vectorstore global con k=40 (más contexto).
+    - Usa retriever_resumenes para contexto macro (resúmenes diarios).
+    """
     data = request.get_json()
     q = data.get("pregunta", "").strip()
     if not q:
         return jsonify({"error": "No se proporcionó una pregunta válida."}), 400
 
     try:
-        # 🧠 1️⃣ Detectar fechas (una o rango)
-        fechas_detectadas = list(dateparser.search.search_dates(q, languages=['es', 'en']))
-        fecha_inicio = fecha_fin = None
+        # 🧠 1️⃣ Detectar entidades y rango de fechas
+        entidades = extraer_entidades(q) if "extraer_entidades" in globals() else {}
+        fecha_inicio, fecha_fin, origen_rango = interpretar_rango_fechas(q, df)
+        print(f"📅 Rango interpretado para la pregunta: {fecha_inicio} → {fecha_fin} ({origen_rango})")
 
-        if len(fechas_detectadas) == 1:
-            fecha_inicio = fecha_fin = fechas_detectadas[0][1].date()
-        elif len(fechas_detectadas) >= 2:
-            fecha_inicio = fechas_detectadas[0][1].date()
-            fecha_fin = fechas_detectadas[1][1].date()
+        tiene_rango = fecha_inicio is not None and fecha_fin is not None
 
-        # 🧩 2️⃣ Detectar entidades clave
-        entidades = extraer_entidades(q)
+        # 🧠 2️⃣ Filtrar DataFrame por rango ANTES de FAISS (solo si hay rango)
+        df_rango = pd.DataFrame()
+        if tiene_rango:
+            # Asegurarnos de trabajar solo con filas que sí tienen fecha
+            df_validas = df.dropna(subset=["Fecha"]).copy()
+            df_validas["Fecha_date"] = pd.to_datetime(df_validas["Fecha"], errors="coerce").dt.date
 
-        # 🧩 3️⃣ Filtrado del DataFrame principal por fecha y entidades
-        df_filtrado = df.copy()
-        if fecha_inicio and fecha_fin:
-            df_filtrado = df_filtrado[
-                (pd.to_datetime(df_filtrado["Fecha"]).dt.date >= fecha_inicio)
-                & (pd.to_datetime(df_filtrado["Fecha"]).dt.date <= fecha_fin)
-            ]
-        elif fecha_inicio:
-            df_filtrado = df_filtrado[
-                pd.to_datetime(df_filtrado["Fecha"]).dt.date == fecha_inicio
-            ]
+            mask = (df_validas["Fecha_date"] >= fecha_inicio) & (df_validas["Fecha_date"] <= fecha_fin)
+            df_rango = df_validas[mask].copy()
 
-        if not df_filtrado.empty:
-            df_filtrado = filtrar_titulares(df_filtrado, entidades, detectar_sentimiento_deseado(q))
+            print(f"🧾 Noticias en rango {fecha_inicio} → {fecha_fin}: {len(df_rango)} filas")
 
-        if df_filtrado.empty:
+        # 🧠 3️⃣ Recuperar resúmenes relevantes (contexto macro)
+        resumen_docs = []
+        if retriever_resumenes is not None:
+            try:
+                # Compatibilidad con distintas versiones de LangChain:
+                if hasattr(retriever_resumenes, "get_relevant_documents"):
+                    resumen_docs = retriever_resumenes.get_relevant_documents(q)
+                else:
+                    resumen_docs = retriever_resumenes.invoke(q)
+            except Exception as e:
+                print(f"⚠️ Error al recuperar resúmenes con LangChain: {e}")
+                resumen_docs = []
+        else:
+            print("⚠️ retriever_resumenes es None (aún no hay resúmenes indexados).")
+
+        # Filtrar resúmenes por rango (con fallback si deja todo vacío)
+        resumen_docs_filtrados, _ = filtrar_docs_por_rango(resumen_docs, fecha_inicio, fecha_fin)
+
+        bloques_resumen = []
+        dias_resumen_usados = []
+        for d in resumen_docs_filtrados:
+            texto = d.page_content.strip()
+            if len(texto) > 600:
+                texto = texto[:600] + "..."
+            fecha_meta = d.metadata.get("fecha") if d.metadata else None
+            if fecha_meta:
+                dias_resumen_usados.append(fecha_meta)
+                bloques_resumen.append(f"[Resumen {fecha_meta}]\n{texto}")
+            else:
+                bloques_resumen.append(f"[Resumen sin fecha]\n{texto}")
+
+        bloque_resumenes = "\n\n".join(bloques_resumen) if bloques_resumen else "No se encontraron resúmenes relevantes."
+
+        # 🧠 4️⃣ Recuperar noticias relevantes (contexto micro)
+        noticias_docs_filtrados = []
+
+        # 4.A) Si hay rango y SÍ hay noticias en el rango → mini-vectorstore temporal
+        if tiene_rango and not df_rango.empty:
+            print("🧩 Usando mini-vectorstore temporal de noticias dentro del rango solicitado.")
+
+            docs_rango = []
+            for _, row in df_rango.iterrows():
+                titulo = str(row.get("Título", "")).strip()
+                if not titulo:
+                    continue
+
+                fecha_val = row.get("Fecha_date") or row.get("Fecha")
+                if pd.notnull(fecha_val):
+                    try:
+                        fecha_str = pd.to_datetime(fecha_val).strftime("%Y-%m-%d")
+                    except Exception:
+                        fecha_str = None
+                else:
+                    fecha_str = None
+
+                metadata = {
+                    "fecha": fecha_str,
+                    "fuente": row.get("Fuente"),
+                    "enlace": row.get("Enlace"),
+                    "cobertura": row.get("Cobertura"),
+                    "sentimiento": row.get("Sentimiento"),
+                    "termino": row.get("Término"),
+                    "idioma": row.get("Idioma"),
+                }
+
+                docs_rango.append(Document(page_content=titulo, metadata=metadata))
+
+            if docs_rango:
+                mini_vs = LCFAISS.from_documents(docs_rango, embeddings)
+                mini_ret = mini_vs.as_retriever(search_kwargs={"k": 40})
+                try:
+                    if hasattr(mini_ret, "get_relevant_documents"):
+                        noticias_docs_filtrados = mini_ret.get_relevant_documents(q)
+                    else:
+                        noticias_docs_filtrados = mini_ret.invoke(q)
+                except Exception as e:
+                    print(f"⚠️ Error al recuperar noticias con mini-vectorstore: {e}")
+                    noticias_docs_filtrados = []
+            else:
+                print("⚠️ No se construyeron documentos para el mini-vectorstore (rango vacío tras limpieza).")
+                noticias_docs_filtrados = []
+
+        # 4.B) Si NO hay rango o NO hay noticias en ese rango → usar vectorstore global (k=40)
+        if (not tiene_rango) or (tiene_rango and df_rango.empty):
+            if tiene_rango and df_rango.empty:
+                print("ℹ️ No hay noticias en el rango pedido; uso vectorstore global como fallback.")
+            else:
+                print("ℹ️ Pregunta sin fechas claras; uso vectorstore global con k=40.")
+
+            noticias_docs = []
+            if 'vectorstore_noticias' in globals() and vectorstore_noticias is not None:
+                try:
+                    retriever_global = vectorstore_noticias.as_retriever(search_kwargs={"k": 40})
+                    if hasattr(retriever_global, "get_relevant_documents"):
+                        noticias_docs = retriever_global.get_relevant_documents(q)
+                    else:
+                        noticias_docs = retriever_global.invoke(q)
+                except Exception as e:
+                    print(f"⚠️ Error al recuperar noticias con vectorstore global: {e}")
+                    noticias_docs = []
+            else:
+                print("⚠️ vectorstore_noticias es None (no se construyó índice global de noticias).")
+
+            # En este caso NO filtramos por fecha otra vez: o no hay rango, o el rango estaba vacío
+            noticias_docs_filtrados = noticias_docs
+
+        # 4.C) Si no hay NADA de contexto (ni resúmenes ni noticias), responde orientando
+        if not resumen_docs_filtrados and not noticias_docs_filtrados:
+            mensaje = (
+                "No encontré noticias claramente relacionadas con tu pregunta en el histórico disponible. "
+                "Intenta reformularla, por ejemplo:\n"
+                "- Especifica un tema (aranceles, tasas de interés, nearshoring, etc.)\n"
+                "- Menciona un país, ciudad o personaje.\n"
+                "- Si quieres un periodo, indica las fechas aproximadas."
+            )
             return jsonify({
-                "respuesta": f"No encontré noticias relacionadas con tu pregunta: '{q}'.",
-                "titulares_usados": []
+                "respuesta": mensaje,
+                "titulares_usados": [],
+                "filtros": {
+                    "entidades": entidades,
+                    "rango": [str(fecha_inicio), str(fecha_fin)] if (fecha_inicio and fecha_fin) else None,
+                    "resumenes_usados": [],
+                }
             })
 
-        # 🧠 4️⃣ Búsqueda semántica con FAISS (o TF-IDF fallback)
-        resultados = buscar_semantica_noticias(q, df_filtrado, top_k=200)
-        if resultados.empty:
-            return jsonify({
-                "respuesta": f"No encontré coincidencias semánticas para '{q}'.",
-                "titulares_usados": []
+        # 🧾 5️⃣ Construir bloque de titulares + lista para el frontend
+        lineas_titulares = []
+        titulares_usados = []
+        vistos = set()
+
+        for d in noticias_docs_filtrados:
+            titulo = d.page_content.strip()
+            meta = d.metadata or {}
+            fuente = (meta.get("fuente") or "Fuente desconocida").strip()
+            enlace = (meta.get("enlace") or "").strip()
+            fecha_meta = meta.get("fecha") or ""
+
+            clave = (titulo, fuente, enlace, fecha_meta)
+            if clave in vistos:
+                continue
+            vistos.add(clave)
+
+            linea = f"- {titulo} ({fuente}, {fecha_meta})".strip()
+            lineas_titulares.append(linea)
+
+            titulares_usados.append({
+                "titulo": titulo,
+                "medio": fuente,
+                "fecha": fecha_meta,
+                "enlace": enlace,
             })
 
-        # 📰 4️⃣ Seleccionar hasta 10 titulares de fuentes distintas
-        resultados["Fuente"] = resultados["Fuente"].fillna("Fuente desconocida")
+        lineas_titulares = lineas_titulares[:10]
+        titulares_usados = titulares_usados[:10]
 
-        # 🌍 Incluir noticias tanto en español como en inglés
-        if "Idioma" in resultados.columns:
-            resultados["Idioma"] = resultados["Idioma"].fillna("").str.lower().str.strip()
-            # Conserva noticias en español o inglés
-            resultados = resultados[resultados["Idioma"].isin(["es", "en", "español", "ingles", "inglés"])]
+        if lineas_titulares:
+            bloque_titulares = "\n".join(lineas_titulares)
+        else:
+            bloque_titulares = "No se encontraron titulares específicos, solo contexto general de resúmenes."
 
+        # 🧠 6️⃣ Construir texto final para la chain de LangChain
+        texto_usuario = f"""{CONTEXTO_POLITICO}
 
-        # Tomar primero los títulos únicos por fuente manteniendo el orden de relevancia
-        resultados_unicos = resultados.drop_duplicates(subset=["Fuente"], keep="first")
+Responde en español, de forma clara, profesional y analítica.
+Usa ÚNICAMENTE la información contenida en los resúmenes y titulares listados abajo.
+Si hay resúmenes o titulares en inglés, traduce y sintetiza su contenido.
 
-        # Limitar a 10
-        top_noticias = resultados_unicos.head(10)
+IMPORTANTE:
+- Si el bloque de "Titulares relevantes" que verás más abajo contiene al menos una viñeta que empiece con "-", significa que SÍ hay noticias para trabajar.
+- Si la pregunta menciona explícitamente a dos actores, países o bloques (por ejemplo, "Trump y México", "Estados Unidos y China"), asegúrate de explicar de forma equilibrada qué ocurre con cada uno y cómo se relacionan entre sí dentro del periodo solicitado.
+- En ese caso, está TOTALMENTE PROHIBIDO escribir frases como:
+  "no se reportaron noticias específicas", "no hubo noticias", 
+  "no se registraron titulares", "no se encontraron noticias sobre X"
+  o cualquier variante equivalente.
+- Aunque las noticias sean pocas, indirectas o tangenciales respecto a la pregunta,
+  debes describir con precisión qué sí se sabe a partir de esos titulares y por qué
+  son relevantes (por ejemplo, porque afectan a México de forma indirecta, etc.).
 
-        # 🧩 5️⃣ Construcción del contexto
-        contexto = "\n".join([
-            f"- {row['Título']} ({row['Fuente']})"
-            for _, row in top_noticias.iterrows()
-        ])
+Solo si el bloque de titulares contiene literalmente el texto:
+"No se encontraron titulares específicos, solo contexto general de resúmenes."
+puedes explicar que no hay noticias puntuales y limitarte al contexto general.
 
-        # 🧠 6️⃣ Prompt para GPT
-        prompt = f"""{CONTEXTO_POLITICO}
+Si el contexto realmente no contiene ningún titular ni resumen relacionado con la pregunta, indícalo explícitamente y no inventes datos.
+Si sí hay información parcial, responde de todas formas describiendo lo que se puede afirmar a partir de esos titulares, sin exagerar pero tampoco diciendo que no hay información.
+No menciones titulares individuales, es decir, si algún titular menciona una noticia, cuenta la noticia, no el hecho de que hay un titular de algún medio hablando de eso.
+Evita frases como “no se dispone de información específica”; en su lugar, explica directamente lo que sí muestran los titulares.
+A menos que el contexto esté totalmente vacío, contesta con un mínimo de 150 palabras.
 
-Responde en español, de forma clara, profesional y analítica,
-usando únicamente los titulares listados a continuación (en español o en inglés). 
-Si hay titulares en inglés, traduce y sintetiza su contenido. 
-A menos de que la respuesta sea que no tienes información, contesta con un mínimo de 150 palabras.
-No inventes datos; si la información no está presente, indícalo.
+Pregunta del usuario:
+{q}
 
+Rango temporal de referencia (si aplica):
+{fecha_inicio} → {fecha_fin}
 
-Pregunta: {q}
+Resúmenes relevantes:
+{bloque_resumenes}
 
-Titulares relevantes: (incluye hasta 10)
-{contexto}
+Titulares relevantes:
+{bloque_titulares}
 
 Respuesta:
 """
 
-        # 🧩 7️⃣ Llamada a OpenAI
-        respuesta = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "Eres un analista de medios experto en política y economía. Responde solo con base en los titulares dados."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.25,
-            max_tokens=700
-        )
-
-        texto_respuesta = respuesta.choices[0].message.content.strip()
-
-        titulares_usados = [
-            {
-                "titulo": row["Título"],
-                "medio": row["Fuente"],
-                "fecha": str(row["Fecha"]),
-                "enlace": row["Enlace"]
-            }
-            for _, row in top_noticias.iterrows()
-        ]
+        # 🧩 7️⃣ Llamada a LangChain (ChatOpenAI + PromptTemplate)
+        texto_respuesta = chain_pregunta.invoke({"texto_usuario": texto_usuario}).strip()
 
         return jsonify({
             "respuesta": texto_respuesta,
             "titulares_usados": titulares_usados,
             "filtros": {
                 "entidades": entidades,
-                "rango": [str(fecha_inicio), str(fecha_fin)] if fecha_inicio else None
+                "rango": [str(fecha_inicio), str(fecha_fin)] if (fecha_inicio and fecha_fin) else None,
+                "resumenes_usados": dias_resumen_usados,
             }
         })
 
     except Exception as e:
-        print(f"❌ Error en /pregunta: {e}")
+        print(f"❌ Error en /pregunta (LangChain): {e}")
         return jsonify({"error": str(e)}), 500
+
+
+
 
 #correoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 @app.route("/enviar_email", methods=["POST"])
